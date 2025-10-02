@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import StasiunSelector from "@/components/stasiunSelector";
 
 interface BookingData {
     origin: string;
@@ -31,12 +32,20 @@ export default function BookingForm() {
         isDifabel: false,
         isPulangPergi: false,
     });
+    const [validationMessage, setValidationMessage] = useState<string>("");
 
     useEffect(() => {
         const savedData = localStorage.getItem(STORAGE_KEY);
         if (savedData) {
             try {
                 const parsedData = JSON.parse(savedData);
+                
+                // Validate departure date - if it's in the past, reset it
+                const today = getTodayDate();
+                if (parsedData.departureDate && parsedData.departureDate < today) {
+                    parsedData.departureDate = "";
+                }
+                
                 setBookingData(parsedData);
             } catch (error) {
                 console.error('Error loading saved booking data:', error);
@@ -50,6 +59,20 @@ export default function BookingForm() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        setValidationMessage("");
+
+        // Validasi stasiun asal dan tujuan tidak boleh sama
+        if (bookingData.origin && bookingData.destination && 
+            bookingData.origin === bookingData.destination) {
+            setValidationMessage('Stasiun asal dan tujuan tidak boleh sama!');
+            return;
+        }
+
+        // Validasi tanggal tidak boleh di masa lalu
+        if (bookingData.departureDate && bookingData.departureDate < getTodayDate()) {
+            setValidationMessage('Tanggal keberangkatan tidak boleh di masa lalu!');
+            return;
+        }
 
         const params = new URLSearchParams({
             origin: bookingData.origin,
@@ -65,10 +88,29 @@ export default function BookingForm() {
     };
 
     const handleInputChange = (field: keyof BookingData, value: string | number | boolean) => {
-        setBookingData(prev => ({
-            ...prev,
-            [field]: value
-        }));
+        // Clear validation message when user starts typing
+        if (validationMessage) {
+            setValidationMessage("");
+        }
+
+        setBookingData(prev => {
+            const newData = {
+                ...prev,
+                [field]: value
+            };
+
+            // Jika mengubah stasiun asal dan ternyata sama dengan tujuan, kosongkan tujuan
+            if (field === 'origin' && value === prev.destination) {
+                newData.destination = "";
+            }
+            
+            // Jika mengubah stasiun tujuan dan ternyata sama dengan asal, kosongkan asal
+            if (field === 'destination' && value === prev.origin) {
+                newData.origin = "";
+            }
+
+            return newData;
+        });
     };
 
     const clearForm = () => {
@@ -85,6 +127,12 @@ export default function BookingForm() {
         localStorage.removeItem(STORAGE_KEY);
     };
 
+    // Get today's date in YYYY-MM-DD format for min date validation
+    const getTodayDate = () => {
+        const today = new Date();
+        return today.toISOString().split('T')[0];
+    };
+
     return (
         <>
             <div className="w-full max-w-md mx-auto">
@@ -98,20 +146,23 @@ export default function BookingForm() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="p-5">
+                    {validationMessage && (
+                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <p className="text-red-700 text-sm font-medium">{validationMessage}</p>
+                        </div>
+                    )}
                     <form onSubmit={handleSubmit} className="space-y-2">
                         {/* Origin */}
                         <div className="space-y-2">
                             <Label htmlFor="origin" className="text-sm font-semibold text-gray-800">
                                 Stasiun Asal
                             </Label>
-                            <Input
-                                id="origin"
-                                type="text"
-                                placeholder="Jakarta Gambir"
+                            <StasiunSelector
                                 value={bookingData.origin}
-                                onChange={(e) => handleInputChange("origin", e.target.value)}
-                                className="w-full h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white"
-                                required
+                                onChange={(value) => handleInputChange("origin", value)}
+                                placeholder="Cari stasiun asal..."
+                                className="w-full"
+                                excludeStasiun={bookingData.destination}
                             />
                         </div>
 
@@ -120,14 +171,12 @@ export default function BookingForm() {
                             <Label htmlFor="destination" className="text-sm font-semibold text-gray-800">
                                 Stasiun Tujuan
                             </Label>
-                            <Input
-                                id="destination"
-                                type="text"
-                                placeholder="Bandung"
+                            <StasiunSelector
                                 value={bookingData.destination}
-                                onChange={(e) => handleInputChange("destination", e.target.value)}
-                                className="w-full h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white"
-                                required
+                                onChange={(value) => handleInputChange("destination", value)}
+                                placeholder="Cari stasiun tujuan..."
+                                className="w-full"
+                                excludeStasiun={bookingData.origin}
                             />
                         </div>
 
@@ -141,6 +190,7 @@ export default function BookingForm() {
                                 type="date"
                                 value={bookingData.departureDate}
                                 onChange={(e) => handleInputChange("departureDate", e.target.value)}
+                                min={getTodayDate()}
                                 className="w-full h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white"
                                 required
                             />
