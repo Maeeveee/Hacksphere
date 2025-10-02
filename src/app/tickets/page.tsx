@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, MapPin, Users, Calendar, ArrowLeft, Train, Wifi, Utensils, Zap, Star, ChevronRight, Bed, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { searchJadwalKereta, type JadwalLengkap } from '@/lib/supabase/queries';
+import UserMenu from '@/components/UserMenu';
 
 interface TicketSearchParams {
     origin: string;
@@ -223,14 +224,17 @@ function TicketPageContent() {
         return (
             <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 min-h-screen">
                 <div className="max-w-6xl mx-auto px-4 py-8">
-                    <Button 
-                        variant="outline" 
-                        onClick={() => router.push('/')}
-                        className="mb-6 bg-white/90 backdrop-blur-md hover:bg-white"
-                    >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Kembali ke Beranda
-                    </Button>
+                    <div className="flex justify-between items-center mb-6">
+                        <Button 
+                            variant="outline" 
+                            onClick={() => router.push('/')}
+                            className="bg-white/90 backdrop-blur-md hover:bg-white"
+                        >
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            Kembali ke Beranda
+                        </Button>
+                        <UserMenu />
+                    </div>
                     
                     <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-md">
                         <CardContent className="text-center py-12">
@@ -259,15 +263,18 @@ function TicketPageContent() {
     return (
         <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 min-h-screen">
             <div className="max-w-6xl mx-auto px-4 py-8">
-                {/* Back Button */}
-                <Button 
-                    variant="outline" 
-                    onClick={() => router.back()}
-                    className="mb-6 bg-white/90 backdrop-blur-md hover:bg-white"
-                >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Kembali ke Pencarian
-                </Button>
+                {/* Header with Back Button and User Menu */}
+                <div className="flex justify-between items-center mb-6">
+                    <Button 
+                        variant="outline" 
+                        onClick={() => router.back()}
+                        className="bg-white/90 backdrop-blur-md hover:bg-white"
+                    >
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Kembali ke Pencarian
+                    </Button>
+                    <UserMenu />
+                </div>
 
                 {/* Search Summary */}
                 <Card className="mb-8 shadow-xl border-0 bg-gradient-to-r from-white/95 to-blue-50/95 backdrop-blur-md overflow-hidden">

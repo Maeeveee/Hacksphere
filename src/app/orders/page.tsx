@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Clock, MapPin, Train, Users, CreditCard, Wifi, Utensils, Zap, Bed, Star, CheckCircle, AlertCircle } from "lucide-react";
+import UserMenu from "@/components/UserMenu";
 
 interface BookingFormData {
   gender: string;
@@ -396,15 +397,18 @@ function OrderFormContent() {
   return (
     <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 min-h-screen">
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Back Button */}
-        <Button 
-          variant="outline" 
-          onClick={() => router.back()}
-          className="mb-6 bg-white/90 backdrop-blur-md hover:bg-white"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Kembali ke Daftar Tiket
-        </Button>
+        {/* Header with Back Button and User Menu */}
+        <div className="flex justify-between items-center mb-6">
+          <Button 
+            variant="outline" 
+            onClick={() => router.back()}
+            className="bg-white/90 backdrop-blur-md hover:bg-white"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Kembali ke Daftar Tiket
+          </Button>
+          <UserMenu />
+        </div>
 
         {/* Header */}
         <div className="mb-8">
