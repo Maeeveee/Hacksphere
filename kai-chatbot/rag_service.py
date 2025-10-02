@@ -83,4 +83,4 @@ if __name__ == '__main__':
     rag_service = RAGService()
     answer = rag_service.ask("berapa persen biaya administrasi untuk pembatalan tiket?")
     print("\n--- HASIL JAWABAN ---")
-    print(answer)
+    print(answer)   
