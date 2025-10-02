@@ -1,5 +1,4 @@
 // src/components/OrderSummary.tsx
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight } from "lucide-react";
 
 // Helper untuk format Rupiah
@@ -49,14 +48,14 @@ export default function OrderSummary({ order }: OrderSummaryProps) {
   const totalPassengers = order.passengers.length;
 
   return (
-    <Card className="w-full max-w-sm mx-auto shadow-xl border-slate-200/60 overflow-hidden rounded-xl">
-      {/* Header Oranye */}
-      <CardHeader className="bg-blue-500 text-white p-5">
-        <CardTitle className="text-2xl font-bold">Total {formatCurrency(order.totalPrice)}</CardTitle>
-      </CardHeader>
+    <div className="w-full max-w-sm mx-auto shadow-xl border border-slate-200/60 overflow-hidden rounded-xl">
+      {/* Header Biru */}
+      <div className="bg-blue-500 text-white p-5">
+        <h2 className="text-2xl font-bold">Total {formatCurrency(order.totalPrice)}</h2>
+      </div>
 
       {/* Konten Putih */}
-      <CardContent className="space-y-4 bg-white text-slate-800 p-5">
+      <div className="space-y-4 bg-white text-slate-800 p-5">
         
         {/* Detail Kereta */}
         <div>
@@ -105,7 +104,7 @@ export default function OrderSummary({ order }: OrderSummaryProps) {
           ))}
         </div>
 
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

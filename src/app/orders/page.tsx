@@ -421,9 +421,9 @@ function OrderFormContent() {
           <div className="lg:col-span-2 space-y-6">
             
             {/* Data Pemesanan */}
-            <Card className="shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50 border-b border-gray-100">
-                <CardTitle className="flex items-center gap-3">
+            <div className="shadow-lg bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50 border-b border-gray-100 p-6 rounded-t-lg">
+                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
                     <Users className="w-5 h-5 text-white" />
                   </div>
@@ -431,9 +431,9 @@ function OrderFormContent() {
                     <div className="text-xl font-bold text-gray-800">Data Pemesanan</div>
                     <div className="text-sm text-gray-600">Masukkan data pemesan tiket</div>
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
+                </div>
+              </div>
+              <div className="p-6 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="booker-gender" className="text-sm font-medium text-gray-700">Jenis Kelamin</Label>
@@ -529,12 +529,12 @@ function OrderFormContent() {
                     className="mt-1"
                   />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Checkbox Auto-fill */}
-            <Card className="shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-6">
+            <div className="shadow-lg bg-white hover:shadow-xl transition-all duration-300 rounded-lg">
+              <div className="p-6">
                 <div className="flex items-center space-x-3">
                   <Checkbox
                     id="auto-fill"
@@ -546,14 +546,14 @@ function OrderFormContent() {
                   </Label>
                 </div>
                 <p className="text-xs text-gray-500 mt-2 ml-6">Centang jika pemesan adalah penumpang pertama</p>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Data Penumpang - Dynamic sections */}
             {passengersData.map((passenger, index) => (
-              <Card key={index} className="shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-green-50/50 to-emerald-50/50 border-b border-gray-100">
-                  <CardTitle className="flex items-center gap-3">
+              <div key={index} className="shadow-lg bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg">
+                <div className="bg-gradient-to-r from-green-50/50 to-emerald-50/50 border-b border-gray-100 p-6 rounded-t-lg">
+                  <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
                       <Users className="w-5 h-5 text-white" />
                     </div>
@@ -571,9 +571,9 @@ function OrderFormContent() {
                         Masukkan data penumpang sesuai identitas resmi
                       </div>
                     </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 space-y-4">
+                  </div>
+                </div>
+                <div className="p-6 space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor={`passenger-${index}-gender`} className="text-sm font-medium text-gray-700">Jenis Kelamin</Label>
@@ -648,14 +648,14 @@ function OrderFormContent() {
                       )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
 
             {/* Ketentuan Reservasi */}
-            <Card className="shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-orange-50/50 to-amber-50/50 border-b border-gray-100">
-                <CardTitle className="flex items-center gap-3">
+            <div className="shadow-lg bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-orange-50/50 to-amber-50/50 border-b border-gray-100 p-6 rounded-t-lg">
+                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-r from-orange-600 to-amber-600 rounded-full flex items-center justify-center">
                     <AlertCircle className="w-5 h-5 text-white" />
                   </div>
@@ -663,9 +663,9 @@ function OrderFormContent() {
                     <div className="text-xl font-bold text-gray-800">Ketentuan & Syarat Reservasi</div>
                     <div className="text-sm text-gray-600">Harap baca dan pahami syarat dan ketentuan</div>
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
+                </div>
+              </div>
+              <div className="p-6">
                 <div className="space-y-4 text-sm text-gray-700">
                   <div className="flex items-start gap-3">
                     <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
@@ -692,20 +692,20 @@ function OrderFormContent() {
                     <p>Penumpang anak-anak harus didampingi oleh orang dewasa</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
 
           {/* Right Column - Ticket Summary */}
           <div className="lg:col-span-1">
-            <Card className="sticky top-8 shadow-xl border border-gray-200 bg-white overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                <CardTitle className="flex items-center gap-2 text-white">
+            <div className="sticky top-8 shadow-xl bg-white overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-lg">
+                <div className="flex items-center gap-2 text-white">
                   <Train className="w-5 h-5"/>
-                  Ringkasan Pemesanan
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
+                  <span className="text-lg font-semibold">Ringkasan Pemesanan</span>
+                </div>
+              </div>
+              <div className="p-0">
                 {/* Train Info */}
                 <div className="p-4 border-b border-gray-100">
                   <div className="flex items-start justify-between mb-4">
@@ -827,8 +827,8 @@ function OrderFormContent() {
                     Pembayaran aman & terpercaya
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
       </div>

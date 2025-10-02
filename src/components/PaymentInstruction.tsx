@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Clock } from 'lucide-react';
 
@@ -37,14 +36,14 @@ export default function PaymentInstructions({ paymentCode, deadlineSeconds, onPa
     }, [timeLeft]);
 
     return (
-        <Card className="shadow-xl border-0 bg-white/95 backdrop-blur-md text-center">
-            <CardHeader>
-                <CardTitle className="text-2xl font-bold text-gray-800">Selesaikan Pembayaran</CardTitle>
-                <CardDescription>
+        <div className="shadow-xl border-0 bg-white/95 backdrop-blur-md text-center rounded-lg overflow-hidden">
+            <div className="bg-blue-500 text-white p-6">
+                <h2 className="text-2xl font-bold">Selesaikan Pembayaran</h2>
+                <p className="text-blue-100 mt-2">
                     Segera lakukan pembayaran sebelum batas waktu berakhir.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 px-8 py-10">
+                </p>
+            </div>
+            <div className="space-y-6 px-8 py-10 bg-white">
                 <div className="bg-blue-600 text-white rounded-lg p-4">
                     <p className="text-sm uppercase">Kode Pembayaran</p>
                     <p className="text-3xl font-bold tracking-widest">{paymentCode}</p>
@@ -65,7 +64,7 @@ export default function PaymentInstructions({ paymentCode, deadlineSeconds, onPa
                 >
                     {timeLeft > 0 ? 'Selesaikan Pembayaran' : 'Waktu Habis'}
                 </Button>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }

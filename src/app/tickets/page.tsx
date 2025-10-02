@@ -2,7 +2,6 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, MapPin, Users, Calendar, ArrowLeft, Train, Wifi, Utensils, Zap, Star, ChevronRight, Bed, Loader2 } from "lucide-react";
@@ -236,8 +235,8 @@ function TicketPageContent() {
                         <UserMenu />
                     </div>
                     
-                    <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-md">
-                        <CardContent className="text-center py-12">
+                    <div className="shadow-lg border border-slate-200/60 bg-white/90 backdrop-blur-md rounded-xl">
+                        <div className="text-center py-12 p-6">
                             <div className="text-gray-400 mb-4">
                                 <MapPin className="w-16 h-16 mx-auto" />
                             </div>
@@ -253,8 +252,8 @@ function TicketPageContent() {
                             >
                                 Mulai Pencarian
                             </Button>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
                 </div>
             </div>
         );
@@ -277,19 +276,19 @@ function TicketPageContent() {
                 </div>
 
                 {/* Search Summary */}
-                <Card className="mb-8 shadow-xl border-0 bg-gradient-to-r from-white/95 to-blue-50/95 backdrop-blur-md overflow-hidden">
-                    <CardHeader className="pb-4 bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
-                        <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
+                <div className="mb-8 shadow-xl border border-slate-200/60 bg-gradient-to-r from-white/95 to-blue-50/95 backdrop-blur-md overflow-hidden rounded-xl">
+                    <div className="bg-blue-500 text-white p-6">
+                        <h2 className="text-xl font-bold flex items-center gap-3">
+                            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                                 <MapPin className="w-5 h-5 text-white" />
                             </div>
                             Hasil Pencarian Tiket
-                            <Badge className="bg-blue-100 text-blue-800 text-xs">
+                            <Badge className="bg-white/20 text-white text-xs">
                                 {tickets.length} kereta ditemukan
                             </Badge>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pb-6">
+                        </h2>
+                    </div>
+                    <div className="pb-6 bg-white p-6">
                         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div className="bg-white/80 p-4 rounded-xl shadow-sm border border-blue-100">
                                 <div className="flex items-center gap-3">
@@ -364,22 +363,22 @@ function TicketPageContent() {
                                 </div>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
 
                 <div className="space-y-4">
                     {loading ? (
-                        <Card className="shadow-lg border border-gray-200 bg-white">
-                            <CardContent className="p-8 text-center">
+                        <div className="shadow-lg border border-gray-200 bg-white rounded-xl">
+                            <div className="p-8 text-center">
                                 <div className="flex items-center justify-center gap-3">
                                     <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                                     <span className="text-gray-700 font-medium">Mencari jadwal kereta...</span>
                                 </div>
-                            </CardContent>
-                        </Card>
+                            </div>
+                        </div>
                     ) : error ? (
-                        <Card className="shadow-lg border border-red-200 bg-red-50">
-                            <CardContent className="p-8 text-center">
+                        <div className="shadow-lg border border-red-200 bg-red-50 rounded-xl">
+                            <div className="p-8 text-center">
                                 <div className="text-red-700 font-medium mb-2">❌ Database Error</div>
                                 <div className="text-red-600 text-sm mb-4">{error}</div>
                                 <div className="text-gray-600 text-xs mb-4">
@@ -392,11 +391,11 @@ function TicketPageContent() {
                                 >
                                     Coba Lagi
                                 </Button>
-                            </CardContent>
-                        </Card>
+                            </div>
+                        </div>
                     ) : tickets.length === 0 ? (
-                        <Card className="shadow-lg border border-gray-200 bg-white">
-                            <CardContent className="p-8 text-center">
+                        <div className="shadow-lg border border-gray-200 bg-white rounded-xl">
+                            <div className="p-8 text-center">
                                 <Train className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                                 <div className="text-gray-700 font-medium mb-2">Tidak ada jadwal kereta ditemukan</div>
                                 <div className="text-gray-500 text-sm mb-4">
@@ -408,12 +407,12 @@ function TicketPageContent() {
                                 >
                                     Coba Rute Lain
                                 </Button>
-                            </CardContent>
-                        </Card>
+                            </div>
+                        </div>
                     ) : (
                         tickets.map((ticket: TrainTicket) => (
-                        <Card key={ticket.id} className="group shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden">
-                            <CardContent className="p-0">
+                        <div key={ticket.id} className="group shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-xl">
+                            <div className="p-0">
                                 {/* Header Section - Simplified */}
                                 <div className="px-6 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-blue-50/30">
                                     <div className="flex items-center justify-between">
@@ -526,8 +525,8 @@ function TicketPageContent() {
                                         </div>
                                     </div>
                                 </div>
-                            </CardContent>
-                        </Card>
+                            </div>
+                        </div>
                     ))
                     )}
                 </div>
