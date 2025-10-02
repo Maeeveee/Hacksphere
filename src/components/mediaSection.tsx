@@ -83,6 +83,39 @@ export default function MediaSection() {
             </div>
           </div>
         )}
+
+        {/* Optional: Dark overlay for better text readability */}
+        {videoLoaded && !videoError && (
+          <div className="absolute inset-0 bg-black/80 pointer-events-none"></div>
+        )}
+
+        {/* Highlight Text Overlay */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center px-6 max-w-4xl">
+            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
+              Jelajahi Indonesia dengan 
+              <span className="text-orange-500"> Kereta Api</span>
+            </h1>
+            <p className="text-xl md:text-2xl text-gray-200 mb-8 leading-relaxed">
+              Nikmati perjalanan yang nyaman, aman, dan terpercaya ke seluruh destinasi impian Anda
+            </p>
+            <div className="flex flex-wrap gap-4 justify-center items-end text-white/90">
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
+                <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                <span className="text-sm font-medium">Booking Online</span>
+              </div>
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
+                <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
+                <span className="text-sm font-medium">Harga Terjangkau</span>
+              </div>
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
+                <span className="w-2 h-2 bg-purple-400 rounded-full"></span>
+                <span className="text-sm font-medium">Perjalanan Nyaman</span>
+              </div>
+            </div>
+          </div>
+        </div>
+    
       </div>
     </div>
   );
