@@ -169,8 +169,32 @@ function OrderFormContent() {
     }
   };
 
+  // Input validation function
+  const validateInput = (field: string, value: string): string => {
+    switch (field) {
+      case 'nomorIdentitas':
+        // Only allow numbers for identity numbers
+        return value.replace(/[^0-9]/g, '');
+      case 'noHP':
+        // Only allow numbers and plus sign for phone numbers
+        return value.replace(/[^0-9+]/g, '');
+      case 'email':
+        // Allow email characters (letters, numbers, @, ., -, _)
+        return value.replace(/[^a-zA-Z0-9@._-]/g, '').toLowerCase();
+      case 'nama':
+        // Only allow letters and spaces for names
+        return value.replace(/[^a-zA-Z\s]/g, '');
+      case 'alamat':
+        // Allow letters, numbers, spaces, and common punctuation for addresses
+        return value.replace(/[^a-zA-Z0-9\s.,/-]/g, '');
+      default:
+        return value;
+    }
+  };
+
   const handleBookingDataChange = (field: keyof BookingFormData, value: string) => {
-    setBookingData(prev => ({ ...prev, [field]: value }));
+    const validatedValue = validateInput(field, value);
+    setBookingData(prev => ({ ...prev, [field]: validatedValue }));
     
     // Auto-update first passenger data if checkbox is checked
     if (useBookingDataForPassenger && passengersData.length > 0) {
@@ -179,7 +203,7 @@ function OrderFormContent() {
         const updatedPassengers = [...passengersData];
         updatedPassengers[0] = {
           ...updatedPassengers[0],
-          [field]: value
+          [field]: validatedValue
         };
         setPassengersData(updatedPassengers);
       }
@@ -189,10 +213,11 @@ function OrderFormContent() {
   const handlePassengerDataChange = (passengerIndex: number, field: keyof PassengerData, value: string) => {
     if (field === 'ageCategory') return; // Age category is set automatically
     
+    const validatedValue = validateInput(field, value);
     const updatedPassengers = [...passengersData];
     updatedPassengers[passengerIndex] = {
       ...updatedPassengers[passengerIndex],
-      [field]: value
+      [field]: validatedValue
     };
     setPassengersData(updatedPassengers);
   };
@@ -211,13 +236,25 @@ function OrderFormContent() {
       alert("Mohon isi nomor identitas");
       return;
     }
+    if (bookingData.tipeIdentitas === 'nik' && bookingData.nomorIdentitas.length !== 16) {
+      alert("NIK harus terdiri dari 16 digit");
+      return;
+    }
     if (!bookingData.noHP.trim()) {
       alert("Mohon isi nomor HP");
+      return;
+    }
+    if (bookingData.noHP.length < 10 || bookingData.noHP.length > 15) {
+      alert("Nomor HP harus terdiri dari 10-15 digit");
       return;
     }
     if (!bookingData.email.trim()) {
       alert("Mohon isi email");
       return;  
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingData.email)) {
+      alert("Format email tidak valid");
+      return;
     }
     router.push('/orders/payment');
     
@@ -238,6 +275,10 @@ function OrderFormContent() {
       }
       if (!passenger.nomorIdentitas.trim()) {
         alert(`Mohon isi nomor identitas penumpang ${i + 1}`);
+        return;
+      }
+      if (passenger.tipeIdentitas === 'nik' && passenger.nomorIdentitas.length !== 16) {
+        alert(`NIK penumpang ${i + 1} harus terdiri dari 16 digit`);
         return;
       }
     }
@@ -360,11 +401,14 @@ function OrderFormContent() {
                     <Label htmlFor="booker-name" className="text-sm font-medium text-gray-700">Nama Pemesan</Label>
                     <Input
                       id="booker-name"
+                      type="text"
                       value={bookingData.nama}
                       onChange={(e) => handleBookingDataChange('nama', e.target.value)}
                       placeholder="Masukkan nama lengkap"
                       className="mt-1"
+                      maxLength={50}
                     />
+                    <p className="text-xs text-gray-500 mt-1">Hanya huruf dan spasi</p>
                   </div>
                 </div>
 
@@ -385,11 +429,16 @@ function OrderFormContent() {
                     <Label htmlFor="booker-id-number" className="text-sm font-medium text-gray-700">Nomor Identitas</Label>
                     <Input
                       id="booker-id-number"
+                      type="text"
                       value={bookingData.nomorIdentitas}
                       onChange={(e) => handleBookingDataChange('nomorIdentitas', e.target.value)}
                       placeholder="Masukkan nomor identitas"
                       className="mt-1"
+                      maxLength={20}
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {bookingData.tipeIdentitas === 'nik' ? 'NIK: 16 digit angka' : 'Hanya angka'}
+                    </p>
                   </div>
                 </div>
 
@@ -397,11 +446,15 @@ function OrderFormContent() {
                   <Label htmlFor="booker-phone" className="text-sm font-medium text-gray-700">No. HP Pemesan</Label>
                   <Input
                     id="booker-phone"
+                    type="tel"
                     value={bookingData.noHP}
                     onChange={(e) => handleBookingDataChange('noHP', e.target.value)}
                     placeholder="Contoh: 081234567890"
                     className="mt-1"
+                    maxLength={15}
+                    minLength={10}
                   />
+                  <p className="text-xs text-gray-500 mt-1">Format: 10-15 digit angka</p>
                 </div>
 
                 <div>
@@ -492,12 +545,17 @@ function OrderFormContent() {
                       <Label htmlFor={`passenger-${index}-name`} className="text-sm font-medium text-gray-700">Nama Penumpang</Label>
                       <Input
                         id={`passenger-${index}-name`}
+                        type="text"
                         value={passenger.nama}
                         onChange={(e) => handlePassengerDataChange(index, 'nama', e.target.value)}
                         disabled={useBookingDataForPassenger && index === 0}
                         placeholder="Masukkan nama lengkap"
                         className={`mt-1 ${useBookingDataForPassenger && index === 0 ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        maxLength={50}
                       />
+                      {!(useBookingDataForPassenger && index === 0) && (
+                        <p className="text-xs text-gray-500 mt-1">Hanya huruf dan spasi</p>
+                      )}
                     </div>
                   </div>
 
@@ -525,12 +583,19 @@ function OrderFormContent() {
                       <Label htmlFor={`passenger-${index}-id-number`} className="text-sm font-medium text-gray-700">Nomor Identitas</Label>
                       <Input
                         id={`passenger-${index}-id-number`}
+                        type="text"
                         value={passenger.nomorIdentitas}
                         onChange={(e) => handlePassengerDataChange(index, 'nomorIdentitas', e.target.value)}
                         disabled={useBookingDataForPassenger && index === 0}
                         placeholder="Masukkan nomor identitas"
                         className={`mt-1 ${useBookingDataForPassenger && index === 0 ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        maxLength={20}
                       />
+                      {!(useBookingDataForPassenger && index === 0) && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {passenger.tipeIdentitas === 'nik' ? 'NIK: 16 digit angka' : 'Hanya angka'}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </CardContent>
