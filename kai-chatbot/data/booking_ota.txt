@@ -1,0 +1,4 @@
+Prosedur Pemesanan via OTA (Traveloka, tiket.com, dll.):
+- Pesan tiket melalui aplikasi OTA.
+- Sering tersedia promo.
+- Untuk pembatalan/reschedule tetap harus lewat sistem KAI (Access by KAI atau loket stasiun).

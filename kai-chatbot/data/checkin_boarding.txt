@@ -1,0 +1,8 @@
+Prosedur Check-in:
+- Bisa dilakukan mulai 7x24 jam sebelum berangkat.
+- Cara:
+  1. Cetak boarding pass di mesin check-in stasiun.
+  2. E-boarding pass di aplikasi (tersedia 2 jam sebelum berangkat).
+Prosedur Boarding:
+- Verifikasi boarding pass + identitas asli.
+- Face Recognition Boarding Gate (di stasiun besar): masuk dengan scan wajah, tanpa boarding pass/KTP.

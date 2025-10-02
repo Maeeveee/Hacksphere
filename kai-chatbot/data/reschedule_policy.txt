@@ -1,0 +1,11 @@
+Kebijakan Reschedule Tiket:
+- Biaya administrasi 25% dari harga tiket awal.
+- Jika tiket baru lebih mahal: bayar selisih + biaya admin.
+- Jika tiket baru lebih murah: selisih hangus + tetap bayar biaya admin.
+Prosedur via Access by KAI:
+1. Pengajuan min. 2 jam sebelum keberangkatan.
+2. Tiket belum dicetak boarding pass.
+3. Cari jadwal baru, pilih kursi, bayar selisih & biaya admin.
+Prosedur via Loket Stasiun:
+- Pengajuan min. 60 menit sebelum keberangkatan.
+- Dokumen: e-tiket/kode booking + identitas asli.
