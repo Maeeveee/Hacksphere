@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import MediaSection from "@/components/mediaSection";
 import BookingForm from "@/components/bookingForm";
-import Navbar from "@/components/navbar";
+import UserMenu from "@/components/UserMenu";
 
 export default function Home() {
     useEffect(() => {
@@ -34,8 +34,8 @@ export default function Home() {
                                 }}>
                             </div>
                         </div>
-                        <div className="absolute top-0 left-0 right-0 z-50 flex justify-center pt-6">
-                            <Navbar />
+                        <div className="absolute top-0 right-0 z-50 pt-6 px-6">
+                            <UserMenu />
                         </div>
                         <div className="relative z-10 w-full max-w-lg">
                             <BookingForm />

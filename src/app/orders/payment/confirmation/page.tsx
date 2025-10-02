@@ -243,6 +243,51 @@ function PaymentConfirmationContent() {
                 completedAt: new Date().toISOString()
             };
             localStorage.setItem('paymentData', JSON.stringify(completedPayment));
+            
+            // Save to booking history
+            const bookingHistoryItem = {
+                id: Date.now().toString(),
+                bookingCode: paymentData.bookingCode || bookingCode,
+                trainName: paymentData.orderData.ticketData.trainName,
+                trainNumber: paymentData.orderData.ticketData.trainNumber,
+                origin: paymentData.orderData.ticketData.origin,
+                destination: paymentData.orderData.ticketData.destination,
+                departureDate: paymentData.orderData.ticketData.departureDate,
+                departureTime: paymentData.orderData.ticketData.departureTime,
+                arrivalTime: paymentData.orderData.ticketData.arrivalTime,
+                passengerName: paymentData.orderData.passengersData[0]?.nama || paymentData.orderData.bookingData.nama,
+                totalPrice: paymentData.orderData.ticketData.totalPrice,
+                passengers: paymentData.orderData.ticketData.passengers,
+                class: paymentData.orderData.ticketData.class,
+                paymentMethod: paymentData.paymentMethod,
+                bankName: paymentData.bankName,
+                completedAt: new Date().toISOString(),
+                status: 'completed'
+            };
+            
+            // Get existing booking history
+            const existingHistory = localStorage.getItem('bookingHistory');
+            let bookingHistory = [];
+            
+            if (existingHistory) {
+                try {
+                    bookingHistory = JSON.parse(existingHistory);
+                } catch (error) {
+                    console.error('Error parsing booking history:', error);
+                    bookingHistory = [];
+                }
+            }
+            
+            // Add new booking to history
+            bookingHistory.unshift(bookingHistoryItem); // Add to beginning of array
+            
+            // Keep only last 50 bookings to prevent localStorage from getting too large
+            if (bookingHistory.length > 50) {
+                bookingHistory = bookingHistory.slice(0, 50);
+            }
+            
+            // Save updated history
+            localStorage.setItem('bookingHistory', JSON.stringify(bookingHistory));
         }
 
         // Show success notification
