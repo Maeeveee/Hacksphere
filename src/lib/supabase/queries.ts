@@ -47,6 +47,55 @@ export interface JadwalLengkap extends Jadwal {
   stasiun_tujuan: Stasiun;
 }
 
+// Interface untuk tabel tiket
+export interface Tiket {
+  id?: string;
+  booking_code: string;
+  
+  // Data Kereta
+  train_id?: string;
+  train_name: string;
+  train_number: string;
+  train_class: string;
+  
+  // Rute & Jadwal
+  origin: string;
+  destination: string;
+  departure_date: string;
+  departure_time: string;
+  arrival_time: string;
+  duration: string;
+  
+  // Data Pemesan
+  booker_name: string;
+  booker_gender: string;
+  booker_identity_type: string;
+  booker_identity_number: string;
+  booker_phone: string;
+  booker_email: string;
+  booker_address: string;
+  
+  // Data Penumpang
+  passengers_data: any; // JSON
+  passenger_count: number;
+  adult_count: number;
+  child_count: number;
+  
+  // Harga
+  price_per_ticket: number;
+  total_price: number;
+  
+  // Status
+  payment_status?: 'pending' | 'paid' | 'cancelled';
+  booking_status?: 'active' | 'cancelled' | 'completed';
+  
+  // Metadata
+  created_at?: string;
+  updated_at?: string;
+  payment_code?: string;
+  payment_deadline?: string;
+}
+
 // Response type untuk queries
 export type StasiunResponse = {
   data: Stasiun[] | null;
@@ -303,4 +352,80 @@ export async function searchJadwalKereta(
   const { data, error } = await query;
 
   return { data: data as JadwalLengkap[], error };
+}
+
+// Fungsi untuk menyimpan tiket baru
+export async function saveTiket(tiketData: Omit<Tiket, 'id' | 'created_at' | 'updated_at'>): Promise<{ data: Tiket | null; error: any }> {
+  const supabase = createClient();
+  
+  const { data, error } = await supabase
+    .from('tiket')
+    .insert([tiketData])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error saving tiket:', error);
+    return { data: null, error };
+  }
+
+  return { data: data as Tiket, error: null };
+}
+
+// Fungsi untuk mendapatkan tiket berdasarkan booking code
+export async function getTiketByBookingCode(bookingCode: string): Promise<{ data: Tiket | null; error: any }> {
+  const supabase = createClient();
+  
+  const { data, error } = await supabase
+    .from('tiket')
+    .select('*')
+    .eq('booking_code', bookingCode)
+    .single();
+
+  if (error) {
+    console.error('Error getting tiket:', error);
+    return { data: null, error };
+  }
+
+  return { data: data as Tiket, error: null };
+}
+
+// Fungsi untuk update status pembayaran
+export async function updatePaymentStatus(bookingCode: string, status: 'pending' | 'paid' | 'cancelled'): Promise<{ data: Tiket | null; error: any }> {
+  const supabase = createClient();
+  
+  const { data, error } = await supabase
+    .from('tiket')
+    .update({ 
+      payment_status: status,
+      updated_at: new Date().toISOString()
+    })
+    .eq('booking_code', bookingCode)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating payment status:', error);
+    return { data: null, error };
+  }
+
+  return { data: data as Tiket, error: null };
+}
+
+// Fungsi untuk mendapatkan semua tiket berdasarkan email pemesan
+export async function getTiketByEmail(email: string): Promise<{ data: Tiket[] | null; error: any }> {
+  const supabase = createClient();
+  
+  const { data, error } = await supabase
+    .from('tiket')
+    .select('*')
+    .eq('booker_email', email)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error getting tiket by email:', error);
+    return { data: null, error };
+  }
+
+  return { data: data as Tiket[], error: null };
 }
