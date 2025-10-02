@@ -460,7 +460,26 @@ function TicketPageContent() {
                                                 </div>
                                             </div>
                                             <Button 
-                                                onClick={() => router.push('/orders')}
+                                                onClick={() => {
+                                                    // Create ticket data with passenger info
+                                                    const ticketData = {
+                                                        ...ticket,
+                                                        passengers: totalPassengers,
+                                                        adults: ticketSearchParams.adults,
+                                                        children: ticketSearchParams.children,
+                                                        departureDate: ticketSearchParams.departureDate,
+                                                        totalPrice: ticket.price * totalPassengers,
+                                                        isDifabel: ticketSearchParams.isDifabel,
+                                                        isPulangPergi: ticketSearchParams.isPulangPergi
+                                                    };
+
+                                                    // Navigate to orders with ticket data
+                                                    const queryString = new URLSearchParams({
+                                                        ticketData: JSON.stringify(ticketData)
+                                                    }).toString();
+                                                    
+                                                    router.push(`/orders?${queryString}`);
+                                                }}
                                                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 group"
                                             >
                                                 <span>Pilih Kereta</span>
