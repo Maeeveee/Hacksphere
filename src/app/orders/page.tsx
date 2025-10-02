@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +27,7 @@ interface PassengerData {
   nama: string;
   tipeIdentitas: string;
   nomorIdentitas: string;
+  ageCategory: 'adult' | 'child';
 }
 
 interface TicketData {
@@ -51,10 +52,34 @@ interface TicketData {
   isPulangPergi: boolean;
 }
 
+// Sample ticket data for fallback
+const getSampleTicketData = (): TicketData => ({
+  trainId: "1",
+  trainName: "Argo Parahyangan",
+  trainNumber: "ARGO 205",
+  origin: "Jakarta",
+  destination: "Bandung",
+  departureTime: "08:00",
+  arrivalTime: "11:30",
+  duration: "3h 30m",
+  class: "Eksekutif",
+  price: 200000,
+  facilities: ["WiFi", "AC", "Makanan"],
+  availableSeats: 50,
+  passengers: 1,
+  adults: 1,
+  children: 0,
+  departureDate: "2024-01-15",
+  totalPrice: 200000,
+  isDifabel: false,
+  isPulangPergi: false
+});
+
 function OrderFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
+  const [ticketData, setTicketData] = useState<TicketData | null>(null);
   const [bookingData, setBookingData] = useState<BookingFormData>({
     gender: "",
     nama: "",
@@ -65,66 +90,115 @@ function OrderFormContent() {
     alamat: "",
   });
 
-  const [passengerData, setPassengerData] = useState<PassengerData>({
-    gender: "",
-    nama: "",
-    tipeIdentitas: "",
-    nomorIdentitas: "",
-  });
-
+  const [passengersData, setPassengersData] = useState<PassengerData[]>([]);
   const [useBookingDataForPassenger, setUseBookingDataForPassenger] = useState(false);
 
-  // Sample ticket data - in real app this would come from URL params or API
-  const sampleTicketData: TicketData = {
-    trainId: "TRN001",
-    trainName: "Argo Bromo Anggrek",
-    trainNumber: "KA 23",
-    origin: "Jakarta Pasar Senen",
-    destination: "Surabaya Gubeng",
-    departureTime: "08:00",
-    arrivalTime: "20:30",
-    duration: "12j 30m",
-    class: "Eksekutif",
-    price: 450000,
-    facilities: ["AC", "Makanan", "WiFi", "Colokan Listrik", "Selimut"],
-    availableSeats: 45,
-    passengers: 1,
-    adults: 1,
-    children: 0,
-    departureDate: "2025-10-15",
-    totalPrice: 450000,
-    isDifabel: false,
-    isPulangPergi: false
-  };
+  // Load ticket data from URL params
+  useEffect(() => {
+    const ticketDataParam = searchParams?.get('ticketData');
+    if (ticketDataParam) {
+      try {
+        const parsedTicketData = JSON.parse(decodeURIComponent(ticketDataParam));
+        setTicketData(parsedTicketData);
+        
+        // Initialize passengers data based on ticket data
+        const passengers: PassengerData[] = [];
+        
+        // Add adults
+        for (let i = 0; i < parsedTicketData.adults; i++) {
+          passengers.push({
+            gender: "",
+            nama: "",
+            tipeIdentitas: "",
+            nomorIdentitas: "",
+            ageCategory: 'adult'
+          });
+        }
+        
+        // Add children
+        for (let i = 0; i < parsedTicketData.children; i++) {
+          passengers.push({
+            gender: "",
+            nama: "",
+            tipeIdentitas: "",
+            nomorIdentitas: "",
+            ageCategory: 'child'
+          });
+        }
+        
+        setPassengersData(passengers);
+      } catch (error) {
+        console.error('Error parsing ticket data:', error);
+        // Fallback to sample data
+        setTicketData(getSampleTicketData());
+        setPassengersData([{
+          gender: "",
+          nama: "",
+          tipeIdentitas: "",
+          nomorIdentitas: "",
+          ageCategory: 'adult'
+        }]);
+      }
+    } else {
+      // Fallback to sample data
+      setTicketData(getSampleTicketData());
+      setPassengersData([{
+        gender: "",
+        nama: "",
+        tipeIdentitas: "",
+        nomorIdentitas: "",
+        ageCategory: 'adult'
+      }]);
+    }
+  }, [searchParams]);
 
   // Handle auto-fill checkbox
   const handleAutoFillChange = (checked: boolean) => {
     setUseBookingDataForPassenger(checked);
-    if (checked) {
-      setPassengerData({
+    if (checked && passengersData.length > 0) {
+      // Auto-fill first passenger (usually the main passenger)
+      const updatedPassengers = [...passengersData];
+      updatedPassengers[0] = {
+        ...updatedPassengers[0],
         gender: bookingData.gender,
         nama: bookingData.nama,
         tipeIdentitas: bookingData.tipeIdentitas,
         nomorIdentitas: bookingData.nomorIdentitas,
-      });
+      };
+      setPassengersData(updatedPassengers);
     }
   };
 
   const handleBookingDataChange = (field: keyof BookingFormData, value: string) => {
     setBookingData(prev => ({ ...prev, [field]: value }));
     
-    // Auto-update passenger data if checkbox is checked
-    if (useBookingDataForPassenger && field in passengerData) {
-      setPassengerData(prev => ({ ...prev, [field]: value }));
+    // Auto-update first passenger data if checkbox is checked
+    if (useBookingDataForPassenger && passengersData.length > 0) {
+      const relevantFields = ['gender', 'nama', 'tipeIdentitas', 'nomorIdentitas'];
+      if (relevantFields.includes(field)) {
+        const updatedPassengers = [...passengersData];
+        updatedPassengers[0] = {
+          ...updatedPassengers[0],
+          [field]: value
+        };
+        setPassengersData(updatedPassengers);
+      }
     }
   };
 
-  const handlePassengerDataChange = (field: keyof PassengerData, value: string) => {
-    setPassengerData(prev => ({ ...prev, [field]: value }));
+  const handlePassengerDataChange = (passengerIndex: number, field: keyof PassengerData, value: string) => {
+    if (field === 'ageCategory') return; // Age category is set automatically
+    
+    const updatedPassengers = [...passengersData];
+    updatedPassengers[passengerIndex] = {
+      ...updatedPassengers[passengerIndex],
+      [field]: value
+    };
+    setPassengersData(updatedPassengers);
   };
 
   const handleProceedToPayment = () => {
-    // Validasi form
+    // Validasi form booking
     if (!bookingData.nama.trim()) {
       alert("Mohon isi nama pemesan");
       return;
@@ -146,25 +220,32 @@ function OrderFormContent() {
       return;
     }
     
-    // Validasi data penumpang
-    if (!passengerData.nama.trim()) {
-      alert("Mohon isi nama penumpang");
-      return;
-    }
-    if (!passengerData.tipeIdentitas) {
-      alert("Mohon pilih tipe identitas penumpang");
-      return;
-    }
-    if (!passengerData.nomorIdentitas.trim()) {
-      alert("Mohon isi nomor identitas penumpang");
-      return;
+    // Validasi data semua penumpang
+    for (let i = 0; i < passengersData.length; i++) {
+      const passenger = passengersData[i];
+      if (!passenger.nama.trim()) {
+        alert(`Mohon isi nama penumpang ${i + 1}`);
+        return;
+      }
+      if (!passenger.gender) {
+        alert(`Mohon pilih jenis kelamin penumpang ${i + 1}`);
+        return;
+      }
+      if (!passenger.tipeIdentitas) {
+        alert(`Mohon pilih tipe identitas penumpang ${i + 1}`);
+        return;
+      }
+      if (!passenger.nomorIdentitas.trim()) {
+        alert(`Mohon isi nomor identitas penumpang ${i + 1}`);
+        return;
+      }
     }
 
     // Prepare data untuk payment
     const orderData = {
-      ticketData: sampleTicketData,
+      ticketData,
       bookingData,
-      passengerData,
+      passengersData,
       useBookingDataForPassenger
     };
 
@@ -212,6 +293,17 @@ function OrderFormContent() {
         return 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 border-gray-300 shadow-sm';
     }
   };
+
+  if (!ticketData) {
+    return (
+      <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Memuat data tiket...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 min-h-screen">
@@ -346,88 +438,103 @@ function OrderFormContent() {
                     onCheckedChange={handleAutoFillChange}
                   />
                   <Label htmlFor="auto-fill" className="text-sm font-medium text-gray-700">
-                    Gunakan data pemesan sebagai data penumpang
+                    Gunakan data pemesan sebagai penumpang pertama
                   </Label>
                 </div>
-                <p className="text-xs text-gray-500 mt-2 ml-6">Centang jika pemesan adalah penumpang</p>
+                <p className="text-xs text-gray-500 mt-2 ml-6">Centang jika pemesan adalah penumpang pertama</p>
               </CardContent>
             </Card>
 
-            {/* Data Penumpang */}
-            <Card className="shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-green-50/50 to-emerald-50/50 border-b border-gray-100">
-                <CardTitle className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
-                    <Users className="w-5 h-5 text-white" />
+            {/* Data Penumpang - Dynamic sections */}
+            {passengersData.map((passenger, index) => (
+              <Card key={index} className="shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-green-50/50 to-emerald-50/50 border-b border-gray-100">
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
+                      <Users className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-xl font-bold text-gray-800">
+                        Data Penumpang {index + 1}
+                        {passenger.ageCategory === 'child' && (
+                          <Badge className="ml-2 bg-orange-100 text-orange-800 text-xs">Anak-anak</Badge>
+                        )}
+                        {passenger.ageCategory === 'adult' && (
+                          <Badge className="ml-2 bg-blue-100 text-blue-800 text-xs">Dewasa</Badge>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Masukkan data penumpang sesuai identitas resmi
+                      </div>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor={`passenger-${index}-gender`} className="text-sm font-medium text-gray-700">Jenis Kelamin</Label>
+                      <Select 
+                        value={passenger.gender} 
+                        onValueChange={(value) => handlePassengerDataChange(index, 'gender', value)}
+                        disabled={useBookingDataForPassenger && index === 0}
+                      >
+                        <SelectTrigger className={`mt-1 ${useBookingDataForPassenger && index === 0 ? 'bg-gray-100 cursor-not-allowed' : ''}`}>
+                          <SelectValue placeholder="Pilih jenis kelamin" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="tuan">Tuan</SelectItem>
+                          <SelectItem value="nyonya">Nyonya</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor={`passenger-${index}-name`} className="text-sm font-medium text-gray-700">Nama Penumpang</Label>
+                      <Input
+                        id={`passenger-${index}-name`}
+                        value={passenger.nama}
+                        onChange={(e) => handlePassengerDataChange(index, 'nama', e.target.value)}
+                        disabled={useBookingDataForPassenger && index === 0}
+                        placeholder="Masukkan nama lengkap"
+                        className={`mt-1 ${useBookingDataForPassenger && index === 0 ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-xl font-bold text-gray-800">Data Penumpang</div>
-                    <div className="text-sm text-gray-600">Masukkan data penumpang sesuai identitas</div>
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="passenger-gender" className="text-sm font-medium text-gray-700">Jenis Kelamin</Label>
-                    <Select 
-                      value={passengerData.gender} 
-                      onValueChange={(value) => handlePassengerDataChange('gender', value)}
-                      disabled={useBookingDataForPassenger}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Pilih jenis kelamin" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="tuan">Tuan</SelectItem>
-                        <SelectItem value="nyonya">Nyonya</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="passenger-name" className="text-sm font-medium text-gray-700">Nama Penumpang</Label>
-                    <Input
-                      id="passenger-name"
-                      value={passengerData.nama}
-                      onChange={(e) => handlePassengerDataChange('nama', e.target.value)}
-                      disabled={useBookingDataForPassenger}
-                      placeholder="Masukkan nama lengkap"
-                      className="mt-1" 
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="passenger-id-type" className="text-sm font-medium text-gray-700">Tipe Identitas</Label>
-                    <Select 
-                      value={passengerData.tipeIdentitas} 
-                      onValueChange={(value) => handlePassengerDataChange('tipeIdentitas', value)}
-                      disabled={useBookingDataForPassenger}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Pilih tipe identitas" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="nik">NIK (KTP)</SelectItem>
-                        <SelectItem value="paspor">Paspor</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor={`passenger-${index}-id-type`} className="text-sm font-medium text-gray-700">Tipe Identitas</Label>
+                      <Select 
+                        value={passenger.tipeIdentitas} 
+                        onValueChange={(value) => handlePassengerDataChange(index, 'tipeIdentitas', value)}
+                        disabled={useBookingDataForPassenger && index === 0}
+                      >
+                        <SelectTrigger className={`mt-1 ${useBookingDataForPassenger && index === 0 ? 'bg-gray-100 cursor-not-allowed' : ''}`}>
+                          <SelectValue placeholder="Pilih tipe identitas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="nik">NIK (KTP)</SelectItem>
+                          <SelectItem value="paspor">Paspor</SelectItem>
+                          {passenger.ageCategory === 'child' && (
+                            <SelectItem value="kartu-keluarga">Kartu Keluarga</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor={`passenger-${index}-id-number`} className="text-sm font-medium text-gray-700">Nomor Identitas</Label>
+                      <Input
+                        id={`passenger-${index}-id-number`}
+                        value={passenger.nomorIdentitas}
+                        onChange={(e) => handlePassengerDataChange(index, 'nomorIdentitas', e.target.value)}
+                        disabled={useBookingDataForPassenger && index === 0}
+                        placeholder="Masukkan nomor identitas"
+                        className={`mt-1 ${useBookingDataForPassenger && index === 0 ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="passenger-id-number" className="text-sm font-medium text-gray-700">Nomor Identitas</Label>
-                    <Input
-                      id="passenger-id-number"
-                      value={passengerData.nomorIdentitas}
-                      onChange={(e) => handlePassengerDataChange('nomorIdentitas', e.target.value)}
-                      disabled={useBookingDataForPassenger}
-                      placeholder="Masukkan nomor identitas"
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ))}
 
             {/* Ketentuan Reservasi */}
             <Card className="shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden">
@@ -466,7 +573,7 @@ function OrderFormContent() {
                   </div>
                   <div className="flex items-start gap-3">
                     <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
-                    <p>Penumpang wajib mematuhi protokol kesehatan yang berlaku</p>
+                    <p>Penumpang anak-anak harus didampingi oleh orang dewasa</p>
                   </div>
                 </div>
               </CardContent>
@@ -487,18 +594,18 @@ function OrderFormContent() {
                 <div className="p-4 border-b border-gray-100">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1 min-w-0 pr-3">
-                      <h3 className="font-bold text-lg text-gray-800 mb-1 break-words leading-tight">{sampleTicketData.trainName}</h3>
+                      <h3 className="font-bold text-lg text-gray-800 mb-1 break-words leading-tight">{ticketData.trainName}</h3>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge className={`${getClassBadgeColor(sampleTicketData.class)} font-medium text-xs px-2 py-1`}>
-                          {sampleTicketData.class}
+                        <Badge className={`${getClassBadgeColor(ticketData.class)} font-medium text-xs px-2 py-1`}>
+                          {ticketData.class}
                         </Badge>
-                        <span className="text-xs text-gray-600">{sampleTicketData.trainNumber}</span>
+                        <span className="text-xs text-gray-600">{ticketData.trainNumber}</span>
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <div className="text-xs text-gray-600">Tanggal</div>
                       <div className="font-semibold text-sm text-gray-800">
-                        {new Date(sampleTicketData.departureDate).toLocaleDateString('id-ID', { 
+                        {new Date(ticketData.departureDate).toLocaleDateString('id-ID', { 
                           day: 'numeric', 
                           month: 'short',
                           year: 'numeric'
@@ -511,8 +618,8 @@ function OrderFormContent() {
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3">
                     <div className="flex items-center justify-between">
                       <div className="text-center flex-1 min-w-0">
-                        <div className="text-xl font-bold text-gray-800">{sampleTicketData.departureTime}</div>
-                        <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{sampleTicketData.origin}</div>
+                        <div className="text-xl font-bold text-gray-800">{ticketData.departureTime}</div>
+                        <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{ticketData.origin}</div>
                       </div>
                       <div className="flex-shrink-0 mx-2 flex items-center justify-center">
                         <div className="flex items-center gap-1 text-xs text-gray-600">
@@ -522,12 +629,12 @@ function OrderFormContent() {
                         </div>
                       </div>
                       <div className="text-center flex-1 min-w-0">
-                        <div className="text-xl font-bold text-gray-800">{sampleTicketData.arrivalTime}</div>
-                        <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{sampleTicketData.destination}</div>
+                        <div className="text-xl font-bold text-gray-800">{ticketData.arrivalTime}</div>
+                        <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{ticketData.destination}</div>
                       </div>
                     </div>
                     <div className="text-center text-xs text-gray-600 mt-2">
-                      Durasi: {sampleTicketData.duration}
+                      Durasi: {ticketData.duration}
                     </div>
                   </div>
                 </div>
@@ -536,7 +643,7 @@ function OrderFormContent() {
                 <div className="p-4 border-b border-gray-100">
                   <h4 className="font-semibold text-sm text-gray-800 mb-2">Fasilitas Tersedia</h4>
                   <div className="grid grid-cols-1 gap-1.5">
-                    {sampleTicketData.facilities.map((facility, index) => (
+                    {ticketData.facilities.map((facility: string, index: number) => (
                       <div key={index} className="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 p-2 rounded-md">
                         <div className="text-blue-600 flex-shrink-0">
                           {getFacilityIcon(facility)}
@@ -549,12 +656,22 @@ function OrderFormContent() {
 
                 {/* Passenger Info */}
                 <div className="p-4 border-b border-gray-100">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-gray-600">Jumlah Penumpang</span>
-                    <span className="font-medium text-sm">{sampleTicketData.passengers} Orang</span>
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    (Dewasa: {sampleTicketData.adults}, Anak-anak: {sampleTicketData.children})
+                  <h4 className="font-semibold text-sm text-gray-800 mb-2">Detail Penumpang</h4>
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-600">Total Penumpang</span>
+                      <span className="font-medium text-sm">{ticketData.passengers} Orang</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-600">Dewasa</span>
+                      <span className="font-medium">{ticketData.adults} Orang</span>
+                    </div>
+                    {ticketData.children > 0 && (
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-600">Anak-anak</span>
+                        <span className="font-medium">{ticketData.children} Orang</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -563,11 +680,11 @@ function OrderFormContent() {
                   <div className="space-y-1.5 mb-3">
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-600">Harga per tiket</span>
-                      <span className="font-medium">{formatPrice(sampleTicketData.price)}</span>
+                      <span className="font-medium">{formatPrice(ticketData.price)}</span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-600">Jumlah penumpang</span>
-                      <span className="font-medium">{sampleTicketData.passengers}x</span>
+                      <span className="font-medium">{ticketData.passengers}x</span>
                     </div>
                   </div>
                   
@@ -575,7 +692,7 @@ function OrderFormContent() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-semibold text-gray-800">Total Harga</span>
                       <span className="text-lg font-bold text-blue-600">
-                        {formatPrice(sampleTicketData.totalPrice)}
+                        {formatPrice(ticketData.totalPrice)}
                       </span>
                     </div>
                   </div>
