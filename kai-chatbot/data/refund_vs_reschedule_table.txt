@@ -1,0 +1,6 @@
+Perbandingan Refund vs Reschedule:
+Biaya Admin: Sama (25%).
+Batas waktu online: Refund & Reschedule min. 2 jam sebelum berangkat.
+Batas waktu loket: Refund min. 30-60 menit; Reschedule min. 60 menit.
+Selisih Tarif: Refund → tidak berlaku; Reschedule → bayar selisih jika lebih mahal, tidak ada refund jika lebih murah.
+Dokumen Loket: Refund → ID asli+fotokopi, formulir, surat kuasa; Reschedule → ID asli + kode booking.

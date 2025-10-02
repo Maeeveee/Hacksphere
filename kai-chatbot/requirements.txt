@@ -1,0 +1,11 @@
+langchain
+langchain_community
+langchain_ollama
+# Gunakan ChromaDB untuk database vektor yang persisten
+chromadb
+# Model embedding yang lebih baik
+sentence-transformers
+# Server API
+fastapi
+uvicorn[standard]
+python-dotenv

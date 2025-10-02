@@ -1,0 +1,7 @@
+Prosedur Pemesanan Tiket via Website booking.kai.id:
+1. Masukkan stasiun asal & tujuan, tanggal, jumlah penumpang.
+2. Klik "Cari & Pesan Tiket".
+3. Pilih kereta & kelas.
+4. Isi data penumpang.
+5. Pilih kursi.
+6. Lanjut ke pembayaran.

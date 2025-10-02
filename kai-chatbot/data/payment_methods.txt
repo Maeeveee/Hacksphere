@@ -1,0 +1,10 @@
+Metode Pembayaran Tiket KAI:
+1. Digital & Online:
+   - Virtual Account (BRIVA, Mandiri, BNI, BSI) – batas waktu 45 menit.
+   - Mobile/Internet Banking (Livin, BRImo, KlikBCA).
+   - E-Wallet & QRIS (SpeedCash, QRIS).
+   - Kartu Kredit/Debit (Visa, Mastercard, JCB).
+2. Offline & Tunai:
+   - Gerai Ritel (Alfamart, Indomaret, Fastpay) + biaya admin.
+   - Kantor Pos (tunjukkan kode pembayaran).
+   - ATM (menu Bayar/Beli > Tiket > Kereta Api).

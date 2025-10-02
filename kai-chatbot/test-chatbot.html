@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Chatbot KAI</title>
+    <style>
+        /* --- Basic Styling --- */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        /* --- Chat Container --- */
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            height: 80vh;
+            max-height: 700px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            padding: 16px;
+            background-color: #00529B; /* Warna KAI */
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        /* --- Chat Window --- */
+        .chat-window {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* --- Messages --- */
+        .message {
+            padding: 10px 15px;
+            border-radius: 18px;
+            max-width: 75%;
+            line-height: 1.4;
+        }
+
+        .user-message {
+            background-color: #007bff;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .bot-message {
+            background-color: #e9ecef;
+            color: #333;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        
+        /* --- Input Area --- */
+        .chat-input {
+            border-top: 1px solid #ddd;
+            padding: 15px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input input {
+            flex-grow: 1;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            padding: 10px 15px;
+            font-size: 1rem;
+        }
+
+        .chat-input button {
+            background-color: #FF6600; /* Warna KAI Orange */
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .chat-input button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <div class="chat-header">KAI GOAT Chatbot - Test UI</div>
+        <div class="chat-window" id="chat-window">
+            <div class="message bot-message">Halo! Ada yang bisa saya bantu seputar layanan KAI?</div>
+        </div>
+        <div class="chat-input">
+            <input type="text" id="user-input" placeholder="Ketik pertanyaanmu di sini...">
+            <button id="send-btn">Kirim</button>
+        </div>
+    </div>
+
+    <script>
+        const chatWindow = document.getElementById('chat-window');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const apiUrl = 'http://127.0.0.1:8000/ask';
+
+        // Fungsi untuk menambahkan pesan ke jendela chat
+        function addMessage(text, sender) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', `${sender}-message`);
+            messageElement.textContent = text;
+            chatWindow.appendChild(messageElement);
+            chatWindow.scrollTop = chatWindow.scrollHeight; // Auto-scroll ke bawah
+            return messageElement;
+        }
+
+        async function handleSendMessage() {
+            const question = userInput.value.trim();
+            if (!question) return;
+
+            // 1. Tampilkan pesan pengguna
+            addMessage(question, 'user');
+            userInput.value = '';
+            sendBtn.disabled = true;
+
+            // 2. Tampilkan indikator loading dari bot
+            const loadingMessage = addMessage('...', 'bot');
+            
+            try {
+                // 3. Kirim pertanyaan ke API backend
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: question })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // 4. Update pesan loading dengan jawaban dari bot
+                loadingMessage.textContent = data.answer;
+
+            } catch (error) {
+                console.error("Error fetching API:", error);
+                loadingMessage.textContent = 'Maaf, terjadi kesalahan. Coba lagi nanti.';
+            } finally {
+                sendBtn.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        // Event listener untuk tombol Kirim dan tombol Enter
+        sendBtn.addEventListener('click', handleSendMessage);
+        userInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                handleSendMessage();
+            }
+        });
+
+    </script>
+</body>
+</html>

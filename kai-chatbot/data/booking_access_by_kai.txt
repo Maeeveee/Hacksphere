@@ -1,0 +1,10 @@
+Prosedur Pemesanan Tiket via Access by KAI:
+1. Unduh aplikasi dari Play Store/App Store, daftar akun.
+2. Login, pilih layanan kereta (Antar Kota, Lokal, LRT, Bandara, Cepat).
+3. Isi detail perjalanan (asal, tujuan, tanggal, jumlah penumpang).
+4. Cari & pilih kereta (kelas, jadwal, harga).
+5. Isi data penumpang (dewasa, anak dengan NIK KIA/KK, bayi <3 tahun).
+6. Pilih kursi.
+7. Tambahkan layanan tambahan (asuransi, RailFood).
+8. Lanjut ke pembayaran, pilih metode.
+Fitur khusus: "Cek & Tambah Tiket" untuk integrasi tiket dari kanal eksternal.

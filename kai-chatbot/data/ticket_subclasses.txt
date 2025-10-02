@@ -1,0 +1,5 @@
+Sistem Sub-Kelas (Tarif Dinamis):
+- Kode huruf (A, H, I, J untuk Eksekutif).
+- Tidak beda fasilitas, hanya beda harga (yield management).
+- Sub-kelas awal (A, B, C) harga tertinggi, biasanya kursi tengah gerbong.
+- Sub-kelas akhir (X, Y, Z) harga lebih rendah, sering untuk promosi.
