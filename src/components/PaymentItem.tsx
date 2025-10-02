@@ -19,7 +19,9 @@ export default function PaymentItem({ bankName, logoSrc, instructions }: Payment
     const handlePayment = () => {
         // Arahkan ke halaman konfirmasi
         // Di aplikasi nyata, Anda mungkin akan membuat pesanan dulu dan mendapatkan ID pesanan
-        router.push('/payment/confirmation');
+        // router.push('confirmationPayment');
+        // router push menggunakan path
+        router.push('/orders/payment/confirmation');
     };
 
     return (
@@ -28,7 +30,7 @@ export default function PaymentItem({ bankName, logoSrc, instructions }: Payment
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full flex justify-between items-center p-4 text-left hover:bg-gray-50 transition-colors"
             >
-                <Image src={logoSrc} alt={`${bankName} logo`} width={80} height={25} className="object-contain" />
+                {/* <Image src={logoSrc} alt={`${bankName} logo`} width={80} height={25} className="object-contain" /> */}
                 <span className={`transform transition-transform ${isOpen ? 'rotate-90' : 'rotate-0'}`}>{'>'}</span>
             </button>
             {isOpen && (
