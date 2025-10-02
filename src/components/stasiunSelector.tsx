@@ -10,13 +10,15 @@ interface StasiunSelectorProps {
   value?: string;
   onChange: (value: string) => void;
   className?: string;
+  excludeStasiun?: string; // Nama stasiun yang harus dikecualikan dari daftar
 }
 
 export default function StasiunSelector({ 
   placeholder = "Pilih stasiun...", 
   value = "", 
   onChange,
-  className = ""
+  className = "",
+  excludeStasiun
 }: StasiunSelectorProps) {
   const [stasiuns, setStasiuns] = useState<Stasiun[]>([]);
   const [loading, setLoading] = useState(false);
@@ -45,12 +47,27 @@ export default function StasiunSelector({
     setSearchTerm(value);
   }, [value]);
 
+  // Update stasiun list when excludeStasiun changes
+  useEffect(() => {
+    if (stasiuns.length > 0) {
+      if (searchTerm.trim() === '') {
+        loadStasiuns();
+      } else {
+        handleSearch(searchTerm);
+      }
+    }
+  }, [excludeStasiun]);
+
   const loadStasiuns = async () => {
     setLoading(true);
     const { data, error } = await getAllStasiun();
     
     if (!error) {
-      setStasiuns(data || []);
+      // Filter out excluded stasiun
+      const filteredData = (data || []).filter(stasiun => 
+        !excludeStasiun || stasiun.nama_stasiun !== excludeStasiun
+      );
+      setStasiuns(filteredData);
     }
     
     setLoading(false);
@@ -69,7 +86,11 @@ export default function StasiunSelector({
     const { data, error } = await searchStasiun(term);
     
     if (!error) {
-      setStasiuns(data || []);
+      // Filter out excluded stasiun
+      const filteredData = (data || []).filter(stasiun => 
+        !excludeStasiun || stasiun.nama_stasiun !== excludeStasiun
+      );
+      setStasiuns(filteredData);
     }
     
     setLoading(false);
