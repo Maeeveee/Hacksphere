@@ -6,6 +6,7 @@ import OrderSummary from "@/components/OrderSummary";
 import PaymentOptions from "@/components/PaymentOptions";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import UserMenu from "@/components/UserMenu";
 
 interface BookingFormData {
   gender: string;
@@ -199,15 +200,18 @@ function PaymentPageContent() {
       <div className="container mx-auto max-w-6xl px-4 py-8">
         
         {/* Header Halaman */}
-        <div className="flex items-center mb-6">
-           <Button 
-             variant="outline" 
-             onClick={handleBackClick}
-             className="rounded-full h-10 w-10 p-0 mr-4 bg-white/80 backdrop-blur-sm hover:bg-white"
-           >
-             <ArrowLeft className="h-5 w-5 text-gray-700" />
-           </Button>
-           <h1 className="text-3xl font-bold text-slate-800">Pembayaran</h1>
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center">
+            <Button 
+              variant="outline" 
+              onClick={handleBackClick}
+              className="rounded-full h-10 w-10 p-0 mr-4 bg-white/80 backdrop-blur-sm hover:bg-white"
+            >
+              <ArrowLeft className="h-5 w-5 text-gray-700" />
+            </Button>
+            <h1 className="text-3xl font-bold text-slate-800">Pembayaran</h1>
+          </div>
+          <UserMenu />
         </div>
 
         {/* Konten Utama */}

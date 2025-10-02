@@ -1,6 +1,5 @@
 "use client";
 
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { QRCodeSVG } from "qrcode.react";
 import { Train, ArrowRight, Clock, MapPin, User, Tag } from 'lucide-react';
 
@@ -38,9 +37,9 @@ const formatTime = (dateString: string) => {
 
 export default function TicketDisplay({ ticket }: { ticket: TicketData }) {
     return (
-        <Card className="w-full max-w-sm mx-auto bg-white rounded-xl shadow-2xl overflow-hidden border-0">
+        <div className="w-full max-w-sm mx-auto bg-white rounded-xl shadow-2xl overflow-hidden border-0">
             {/* Header Biru */}
-            <CardHeader className="bg-blue-800 text-white p-4">
+            <div className="bg-blue-800 text-white p-4">
                 <div className="flex items-center justify-between">
                     <div>
                         <p className="text-lg font-bold">{ticket.trainName} ({ticket.trainNumber})</p>
@@ -61,10 +60,10 @@ export default function TicketDisplay({ ticket }: { ticket: TicketData }) {
                         <p className="text-xs opacity-80 text-right">{formatDate(ticket.arrivalDate)}</p>
                     </div>
                 </div>
-            </CardHeader>
+            </div>
 
              {/* Konten Putih */}
-            <CardContent className="p-6 space-y-4 text-center">
+            <div className="p-6 space-y-4 text-center bg-white">
                  <div className="grid grid-cols-2 gap-4 text-left">
                     <div>
                          <p className="text-xs text-gray-500">Penumpang</p>
@@ -88,7 +87,7 @@ export default function TicketDisplay({ ticket }: { ticket: TicketData }) {
                     />
                 </div>
                 <p className="text-sm font-semibold text-gray-700">Pindai kode ini di gerbang</p>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }

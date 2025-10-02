@@ -3,7 +3,6 @@
 
 import { useState } from 'react';
 import PaymentItem from './PaymentItem';
-import { Card, CardContent } from './ui/card';
 
 // --- DATA DUMMY UNTUK CONTOH ---
 const paymentMethods = {
@@ -56,13 +55,13 @@ export default function PaymentOptions() {
   );
 
   return (
-    <Card className="w-full shadow-xl border-slate-200/60 rounded-xl overflow-hidden">
+    <div className="w-full shadow-xl border border-slate-200/60 rounded-xl overflow-hidden">
       <div className="flex border-b border-slate-200 bg-slate-50/50">
         <TabButton id="atm">ATM / MOBILE / INTERNET BANKING</TabButton>
         <TabButton id="retail">GERAI RETAIL</TabButton>
       </div>
 
-      <CardContent className="p-0">
+      <div className="p-0">
         {activeTab === 'atm' && (
           <div>
             {paymentMethods.atm.map(method => (
@@ -79,7 +78,7 @@ export default function PaymentOptions() {
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
