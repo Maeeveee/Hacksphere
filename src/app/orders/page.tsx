@@ -93,8 +93,27 @@ function OrderFormContent() {
   const [passengersData, setPassengersData] = useState<PassengerData[]>([]);
   const [useBookingDataForPassenger, setUseBookingDataForPassenger] = useState(false);
 
-  // Load ticket data from URL params
+  // Load ticket data from URL params or localStorage
   useEffect(() => {
+    // First check if there's existing order data in localStorage (from payment page navigation back)
+    const existingOrderData = localStorage.getItem('orderData');
+    if (existingOrderData) {
+      try {
+        const parsedData = JSON.parse(existingOrderData);
+        if (parsedData.ticketData && parsedData.bookingData && parsedData.passengersData) {
+          setTicketData(parsedData.ticketData);
+          setBookingData(parsedData.bookingData);
+          setPassengersData(parsedData.passengersData);
+          setUseBookingDataForPassenger(parsedData.useBookingDataForPassenger || false);
+          return; // Exit early if data loaded from localStorage
+        }
+      } catch (error) {
+        console.error('Error loading existing order data:', error);
+        localStorage.removeItem('orderData');
+      }
+    }
+
+    // Otherwise, load from URL params
     const ticketDataParam = searchParams?.get('ticketData');
     if (ticketDataParam) {
       try {
@@ -256,7 +275,6 @@ function OrderFormContent() {
       alert("Format email tidak valid");
       return;
     }
-    router.push('/orders/payment');
     
     // Validasi data semua penumpang
     for (let i = 0; i < passengersData.length; i++) {
@@ -291,8 +309,18 @@ function OrderFormContent() {
       useBookingDataForPassenger
     };
 
-    console.log("Order Data:", orderData);
-    alert("Data berhasil disimpan! Lanjut ke pembayaran...");
+    try {
+      // Store order data in localStorage for payment page
+      localStorage.setItem('orderData', JSON.stringify(orderData));
+      
+      console.log("Order Data:", orderData);
+      
+      // Navigate to payment page
+      router.push('/orders/payment');
+    } catch (error) {
+      console.error('Error saving order data:', error);
+      alert('Terjadi kesalahan saat menyimpan data. Silakan coba lagi.');
+    }
   };
 
   const formatPrice = (price: number) => {

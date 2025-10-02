@@ -17,11 +17,9 @@ export default function PaymentItem({ bankName, logoSrc, instructions }: Payment
     const router = useRouter(); // Inisialisasi router
 
     const handlePayment = () => {
-        // Arahkan ke halaman konfirmasi
-        // Di aplikasi nyata, Anda mungkin akan membuat pesanan dulu dan mendapatkan ID pesanan
-        // router.push('confirmationPayment');
-        // router push menggunakan path
-        router.push('/orders/payment/confirmation');
+        // Pass payment method as query parameter to confirmation page
+        const paymentMethod = bankName.toLowerCase().replace(/\s+/g, '_');
+        router.push(`/orders/payment/confirmation?method=${paymentMethod}&bank=${encodeURIComponent(bankName)}`);
     };  
 
     return (
