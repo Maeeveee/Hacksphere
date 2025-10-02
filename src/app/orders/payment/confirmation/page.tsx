@@ -6,6 +6,7 @@ import PaymentInstructions from '@/components/PaymentInstruction';
 import TicketDisplay from '@/components/TicketDisplay';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { saveTiket, updatePaymentStatus, type Tiket } from '@/lib/supabase/queries';
 
 interface BookingFormData {
   gender: string;
@@ -192,6 +193,15 @@ function PaymentConfirmationContent() {
                     
                     // Store payment data for future reference
                     localStorage.setItem('paymentData', JSON.stringify(payment));
+                    
+                    // Save ticket to database
+                    saveTicketToDatabase(payment).then(success => {
+                        if (success) {
+                            console.log('Ticket data saved to database successfully');
+                        } else {
+                            console.error('Failed to save ticket data to database');
+                        }
+                    });
                 } else {
                     console.error('Invalid order data structure');
                     router.push('/orders');
@@ -228,8 +238,90 @@ function PaymentConfirmationContent() {
         };
     }, [router, searchParams, paymentCode, bookingCode, paymentDeadlineInSeconds, isPaid]);
 
-    const handlePaymentComplete = () => {
+    // Fungsi untuk menyimpan data tiket ke database
+    const saveTicketToDatabase = async (paymentData: PaymentData) => {
+        try {
+            const { orderData, bookingCode: bCode, paymentCode: pCode } = paymentData;
+            const { ticketData, bookingData, passengersData } = orderData;
+
+            const tiketData: Omit<Tiket, 'id' | 'created_at' | 'updated_at'> = {
+                booking_code: bCode || bookingCode,
+                
+                // Data Kereta
+                train_id: ticketData.trainId,
+                train_name: ticketData.trainName,
+                train_number: ticketData.trainNumber,
+                train_class: ticketData.class,
+                
+                // Rute & Jadwal
+                origin: ticketData.origin,
+                destination: ticketData.destination,
+                departure_date: ticketData.departureDate,
+                departure_time: ticketData.departureTime,
+                arrival_time: ticketData.arrivalTime,
+                duration: ticketData.duration,
+                
+                // Data Pemesan
+                booker_name: bookingData.nama,
+                booker_gender: bookingData.gender,
+                booker_identity_type: bookingData.tipeIdentitas,
+                booker_identity_number: bookingData.nomorIdentitas,
+                booker_phone: bookingData.noHP,
+                booker_email: bookingData.email,
+                booker_address: bookingData.alamat,
+                
+                // Data Penumpang
+                passengers_data: passengersData,
+                passenger_count: ticketData.passengers,
+                adult_count: ticketData.adults,
+                child_count: ticketData.children,
+                
+                // Harga
+                price_per_ticket: ticketData.price,
+                total_price: ticketData.totalPrice,
+                
+                // Status
+                payment_status: 'pending',
+                booking_status: 'active',
+                
+                // Metadata
+                payment_code: pCode,
+                payment_deadline: new Date(Date.now() + ((paymentData.paymentDeadline || paymentDeadlineInSeconds) * 1000)).toISOString()
+            };
+
+            const { data, error } = await saveTiket(tiketData);
+            
+            if (error) {
+                console.error('Error saving ticket to database:', error);
+                return false;
+            }
+            
+            console.log('Ticket saved successfully:', data);
+            return true;
+            
+        } catch (error) {
+            console.error('Error in saveTicketToDatabase:', error);
+            return false;
+        }
+    };
+
+    const handlePaymentComplete = async () => {
         console.log("Pembayaran Selesai!");
+        
+        // Update payment status in database
+        if (paymentData?.bookingCode) {
+            try {
+                const { data, error } = await updatePaymentStatus(paymentData.bookingCode, 'paid');
+                if (error) {
+                    console.error('Error updating payment status:', error);
+                } else {
+                    console.log('Payment status updated successfully:', data);
+                }
+            } catch (error) {
+                console.error('Error in updatePaymentStatus:', error);
+            }
+        }
+        
         setIsPaid(true);
         
         // Clear order data since payment is complete
