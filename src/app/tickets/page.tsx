@@ -34,12 +34,42 @@ interface TrainTicket {
     facilities: string[];
 }
 
+// Helper function untuk extract jam dan menit dari timestamp
+const extractTime = (timestamp: string): string => {
+    // Ambil bagian waktu dari ISO string (YYYY-MM-DDTHH:MM:SS)
+    if (timestamp.includes('T')) {
+        const timePart = timestamp.split('T')[1];
+        return timePart.substring(0, 5); // Ambil HH:MM
+    }
+    // Fallback untuk format lain
+    const date = new Date(timestamp);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+};
+
 // Convert JadwalLengkap to TrainTicket format
 const convertJadwalToTrainTicket = (jadwalList: JadwalLengkap[]): TrainTicket[] => {
     return jadwalList.map((jadwal) => {
-        // Calculate duration from timestamps
+        // Debug untuk melihat format data dari database
         const departureTime = new Date(jadwal.waktu_berangkat);
         const arrivalTime = new Date(jadwal.waktu_tiba);
+        
+        console.log('🔍 Debug berbagai format waktu:', {
+            '1_raw_from_db': jadwal.waktu_berangkat,
+            '2_extracted_time': extractTime(jadwal.waktu_berangkat),
+            '3_js_date_object': departureTime.toString(),
+            '4_locale_string': departureTime.toLocaleString('id-ID'),
+            '5_time_only': departureTime.toLocaleTimeString('id-ID'),
+            '6_utc_string': departureTime.toISOString(),
+            '7_hours_minutes': `${departureTime.getHours()}:${departureTime.getMinutes().toString().padStart(2, '0')}`
+        });
+        
+        // Extract waktu langsung dari timestamp
+        const departureTimeFormatted = extractTime(jadwal.waktu_berangkat);
+        const arrivalTimeFormatted = extractTime(jadwal.waktu_tiba);
+        
+        // Calculate duration
         const durationMs = arrivalTime.getTime() - departureTime.getTime();
         const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
         const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
@@ -64,8 +94,8 @@ const convertJadwalToTrainTicket = (jadwalList: JadwalLengkap[]): TrainTicket[] 
             trainNumber: jadwal.kereta.kode_kereta,
             origin: jadwal.stasiun_asal.nama_stasiun,
             destination: jadwal.stasiun_tujuan.nama_stasiun,
-            departureTime: departureTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-            arrivalTime: arrivalTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+            departureTime: departureTimeFormatted,
+            arrivalTime: arrivalTimeFormatted,
             duration: duration,
             class: primaryClass,
             price: jadwal.harga,

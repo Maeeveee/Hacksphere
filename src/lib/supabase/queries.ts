@@ -281,15 +281,23 @@ export async function searchJadwalKereta(
     .eq('id_stasiun_tujuan', stasiunTujuanData.id)
     .order('waktu_berangkat', { ascending: true });
 
-  // Filter by date if provided
+  // Filter by date if provided - dengan timezone WIB (UTC+7)
   if (tanggalBerangkat) {
-    const startDate = new Date(tanggalBerangkat);
-    const endDate = new Date(tanggalBerangkat);
-    endDate.setDate(endDate.getDate() + 1);
+    // Buat tanggal dengan timezone WIB
+    const startDate = new Date(tanggalBerangkat + 'T00:00:00+07:00');
+    const endDate = new Date(tanggalBerangkat + 'T23:59:59+07:00');
+    
+    console.log('Filter tanggal:', {
+      input: tanggalBerangkat,
+      startWIB: startDate.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+      endWIB: endDate.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+      startUTC: startDate.toISOString(),
+      endUTC: endDate.toISOString()
+    });
     
     query = query
       .gte('waktu_berangkat', startDate.toISOString())
-      .lt('waktu_berangkat', endDate.toISOString());
+      .lte('waktu_berangkat', endDate.toISOString());
   }
 
   const { data, error } = await query;
