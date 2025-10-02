@@ -52,28 +52,7 @@ interface TicketData {
   isPulangPergi: boolean;
 }
 
-// Sample ticket data for fallback
-const getSampleTicketData = (): TicketData => ({
-  trainId: "1",
-  trainName: "Argo Parahyangan",
-  trainNumber: "ARGO 205",
-  origin: "Jakarta",
-  destination: "Bandung",
-  departureTime: "08:00",
-  arrivalTime: "11:30",
-  duration: "3h 30m",
-  class: "Eksekutif",
-  price: 200000,
-  facilities: ["WiFi", "AC", "Makanan"],
-  availableSeats: 50,
-  passengers: 1,
-  adults: 1,
-  children: 0,
-  departureDate: "2024-01-15",
-  totalPrice: 200000,
-  isDifabel: false,
-  isPulangPergi: false
-});
+
 
 function OrderFormContent() {
   const router = useRouter();
@@ -101,11 +80,19 @@ function OrderFormContent() {
       try {
         const parsedData = JSON.parse(existingOrderData);
         if (parsedData.ticketData && parsedData.bookingData && parsedData.passengersData) {
-          setTicketData(parsedData.ticketData);
-          setBookingData(parsedData.bookingData);
-          setPassengersData(parsedData.passengersData);
-          setUseBookingDataForPassenger(parsedData.useBookingDataForPassenger || false);
-          return; // Exit early if data loaded from localStorage
+          // Additional validation for ticket data completeness
+          const ticketData = parsedData.ticketData;
+          if (ticketData.trainName && ticketData.origin && ticketData.destination && 
+              ticketData.departureTime && ticketData.price && ticketData.departureDate) {
+            setTicketData(parsedData.ticketData);
+            setBookingData(parsedData.bookingData);
+            setPassengersData(parsedData.passengersData);
+            setUseBookingDataForPassenger(parsedData.useBookingDataForPassenger || false);
+            return; // Exit early if data loaded from localStorage
+          } else {
+            console.error('Incomplete ticket data in localStorage');
+            localStorage.removeItem('orderData');
+          }
         }
       } catch (error) {
         console.error('Error loading existing order data:', error);
@@ -118,6 +105,16 @@ function OrderFormContent() {
     if (ticketDataParam) {
       try {
         const parsedTicketData = JSON.parse(decodeURIComponent(ticketDataParam));
+        
+        // Validate required ticket data fields
+        if (!parsedTicketData.trainName || !parsedTicketData.origin || !parsedTicketData.destination || 
+            !parsedTicketData.departureTime || !parsedTicketData.price || !parsedTicketData.departureDate) {
+          console.error('Incomplete ticket data from URL params');
+          alert('Data tiket tidak lengkap. Silakan pilih tiket kembali.');
+          router.push('/tickets');
+          return;
+        }
+        
         setTicketData(parsedTicketData);
         
         // Initialize passengers data based on ticket data
@@ -148,28 +145,30 @@ function OrderFormContent() {
         setPassengersData(passengers);
       } catch (error) {
         console.error('Error parsing ticket data:', error);
-        // Fallback to sample data
-        setTicketData(getSampleTicketData());
-        setPassengersData([{
-          gender: "",
-          nama: "",
-          tipeIdentitas: "",
-          nomorIdentitas: "",
-          ageCategory: 'adult'
-        }]);
+        // Redirect back to tickets page if data is invalid
+        alert('Data tiket tidak valid. Silakan pilih tiket kembali.');
+        router.push('/tickets');
+        return;
       }
     } else {
-      // Fallback to sample data
-      setTicketData(getSampleTicketData());
-      setPassengersData([{
-        gender: "",
-        nama: "",
-        tipeIdentitas: "",
-        nomorIdentitas: "",
-        ageCategory: 'adult'
-      }]);
+      // No ticket data found, redirect to tickets page
+      console.log('No ticket data found, redirecting to tickets page');
+      router.push('/tickets');
+      return;
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
+
+  // Add timeout to redirect if no ticket data is loaded
+  useEffect(() => {
+    if (!ticketData) {
+      const timeout = setTimeout(() => {
+        console.log('Timeout: No ticket data loaded, redirecting to tickets page');
+        router.push('/tickets');
+      }, 5000); // 5 seconds timeout
+
+      return () => clearTimeout(timeout);
+    }
+  }, [ticketData, router]);
 
   // Handle auto-fill checkbox
   const handleAutoFillChange = (checked: boolean) => {
@@ -242,6 +241,12 @@ function OrderFormContent() {
   };
 
   const handleProceedToPayment = () => {
+    // Validate ticket data exists
+    if (!ticketData) {
+      alert("Data tiket tidak ditemukan. Silakan pilih tiket kembali.");
+      router.push('/tickets');
+      return;
+    }
     
     if (!bookingData.nama.trim()) {
       alert("Mohon isi nama pemesan");
@@ -273,6 +278,12 @@ function OrderFormContent() {
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingData.email)) {
       alert("Format email tidak valid");
+      return;
+    }
+
+    // Validate passengers data exists
+    if (!passengersData || passengersData.length === 0) {
+      alert("Data penumpang tidak ditemukan. Silakan refresh halaman.");
       return;
     }
     
@@ -370,6 +381,13 @@ function OrderFormContent() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Memuat data tiket...</p>
+          <p className="mt-2 text-sm text-gray-500">Jika halaman tidak termuat dalam 5 detik, Anda akan diarahkan ke halaman pilih tiket</p>
+          <button 
+            onClick={() => router.push('/tickets')} 
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+          >
+            Pilih Tiket Kembali
+          </button>
         </div>
       </div>
     );
@@ -688,7 +706,9 @@ function OrderFormContent() {
                 <div className="p-4 border-b border-gray-100">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1 min-w-0 pr-3">
-                      <h3 className="font-bold text-lg text-gray-800 mb-1 break-words leading-tight">{ticketData.trainName}</h3>
+                      <h3 className="font-bold text-lg text-gray-800 mb-1 break-words leading-tight">
+                        {ticketData.trainName || 'Nama Kereta Tidak Tersedia'}
+                      </h3>
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge className={`${getClassBadgeColor(ticketData.class)} font-medium text-xs px-2 py-1`}>
                           {ticketData.class}
@@ -712,8 +732,8 @@ function OrderFormContent() {
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3">
                     <div className="flex items-center justify-between">
                       <div className="text-center flex-1 min-w-0">
-                        <div className="text-xl font-bold text-gray-800">{ticketData.departureTime}</div>
-                        <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{ticketData.origin}</div>
+                        <div className="text-xl font-bold text-gray-800">{ticketData.departureTime || '--:--'}</div>
+                        <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{ticketData.origin || 'Stasiun Asal'}</div>
                       </div>
                       <div className="flex-shrink-0 mx-2 flex items-center justify-center">
                         <div className="flex items-center gap-1 text-xs text-gray-600">
@@ -723,8 +743,8 @@ function OrderFormContent() {
                         </div>
                       </div>
                       <div className="text-center flex-1 min-w-0">
-                        <div className="text-xl font-bold text-gray-800">{ticketData.arrivalTime}</div>
-                        <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{ticketData.destination}</div>
+                        <div className="text-xl font-bold text-gray-800">{ticketData.arrivalTime || '--:--'}</div>
+                        <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{ticketData.destination || 'Stasiun Tujuan'}</div>
                       </div>
                     </div>
                     <div className="text-center text-xs text-gray-600 mt-2">
