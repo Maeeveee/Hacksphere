@@ -22,7 +22,7 @@ export default function PaymentItem({ bankName, logoSrc, instructions }: Payment
         // router.push('confirmationPayment');
         // router push menggunakan path
         router.push('/orders/payment/confirmation');
-    };
+    };  
 
     return (
         <div className="border-b">
@@ -32,7 +32,7 @@ export default function PaymentItem({ bankName, logoSrc, instructions }: Payment
             >
                 {/* <Image src={logoSrc} alt={`${bankName} logo`} width={80} height={25} className="object-contain" /> */}
                 <span className={`transform transition-transform ${isOpen ? 'rotate-90' : 'rotate-0'}`}>{'>'}</span>
-            </button>
+            </button>   
             {isOpen && (
                 <div className="p-4 bg-gray-50">
                     {instructions}

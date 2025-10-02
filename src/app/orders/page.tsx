@@ -198,6 +198,7 @@ function OrderFormContent() {
   };
 
   const handleProceedToPayment = () => {
+    
     if (!bookingData.nama.trim()) {
       alert("Mohon isi nama pemesan");
       return;
@@ -216,8 +217,9 @@ function OrderFormContent() {
     }
     if (!bookingData.email.trim()) {
       alert("Mohon isi email");
-      return;
+      return;  
     }
+    router.push('/orders/payment');
     
     // Validasi data semua penumpang
     for (let i = 0; i < passengersData.length; i++) {
