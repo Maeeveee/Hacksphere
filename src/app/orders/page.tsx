@@ -198,7 +198,6 @@ function OrderFormContent() {
   };
 
   const handleProceedToPayment = () => {
-    // Validasi form booking
     if (!bookingData.nama.trim()) {
       alert("Mohon isi nama pemesan");
       return;

@@ -1,12 +1,13 @@
 "use client";
 
-import { Suspense } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, MapPin, Users, Calendar, ArrowLeft, Train, Wifi, Utensils, Zap, Star, ChevronRight, Bed } from "lucide-react";
+import { Clock, MapPin, Users, Calendar, ArrowLeft, Train, Wifi, Utensils, Zap, Star, ChevronRight, Bed, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { searchJadwalKereta, type JadwalLengkap } from '@/lib/supabase/queries';
 
 interface TicketSearchParams {
     origin: string;
@@ -33,55 +34,53 @@ interface TrainTicket {
     facilities: string[];
 }
 
-// Sample data - In real app, this would come from API
-const generateSampleTickets = (searchParams: TicketSearchParams): TrainTicket[] => {
-    const baseTrains = [
-        {
-            trainName: "Argo Bromo Anggrek",
-            trainNumber: "KA 1",
-            class: "Eksekutif",
-            basePrice: 350000,
-            facilities: ["AC", "Makanan", "WiFi", "Colokan Listrik"]
-        },
-        {
-            trainName: "Bima",
-            trainNumber: "KA 2",
-            class: "Bisnis",
-            basePrice: 250000,
-            facilities: ["AC", "Makanan", "WiFi"]
-        },
-        {
-            trainName: "Gaya Baru Malam Selatan",
-            trainNumber: "KA 3",
-            class: "Ekonomi",
-            basePrice: 150000,
-            facilities: ["AC", "WiFi"]
-        },
-        {
-            trainName: "Fajar Utama",
-            trainNumber: "KA 4",
-            class: "Bisnis",
-            basePrice: 280000,
-            facilities: ["AC", "Makanan", "WiFi", "Selimut"]
-        }
-    ];
+// Convert JadwalLengkap to TrainTicket format
+const convertJadwalToTrainTicket = (jadwalList: JadwalLengkap[]): TrainTicket[] => {
+    return jadwalList.map((jadwal) => {
+        // Calculate duration from timestamps
+        const departureTime = new Date(jadwal.waktu_berangkat);
+        const arrivalTime = new Date(jadwal.waktu_tiba);
+        const durationMs = arrivalTime.getTime() - departureTime.getTime();
+        const durationHours = Math.floor(durationMs / (1000 * 60 * 60));
+        const durationMinutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+        const duration = `${durationHours}j ${durationMinutes}m`;
 
-    return baseTrains.map((train, index) => ({
-        id: `ticket-${index + 1}`,
-        ...train,
-        origin: searchParams.origin,
-        destination: searchParams.destination,
-        departureTime: `${6 + index * 2}:${30 + index * 15}`,
-        arrivalTime: `${10 + index * 2}:${45 + index * 15}`,
-        duration: `${4 + index}j ${15 + index * 10}m`,
-        price: train.basePrice + (index * 25000),
-        availableSeats: Math.floor(Math.random() * 50) + 10
-    }));
+        // Get primary class from first gerbong
+        const primaryClass = jadwal.kereta.gerbong?.[0]?.nama_kelas || 'Ekonomi';
+        
+        // Calculate available seats (estimate based on gerbong count)
+        const availableSeats = jadwal.kereta.gerbong ? jadwal.kereta.gerbong.length * 20 : 40;
+
+        // Default facilities based on class
+        const facilities = primaryClass === 'Eksekutif' 
+            ? ['AC', 'Makanan', 'WiFi', 'Colokan Listrik', 'Selimut']
+            : primaryClass === 'Bisnis'
+            ? ['AC', 'WiFi', 'Colokan Listrik']
+            : ['AC'];
+
+        return {
+            id: jadwal.id,
+            trainName: jadwal.kereta.nama_kereta,
+            trainNumber: jadwal.kereta.kode_kereta,
+            origin: jadwal.stasiun_asal.nama_stasiun,
+            destination: jadwal.stasiun_tujuan.nama_stasiun,
+            departureTime: departureTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+            arrivalTime: arrivalTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+            duration: duration,
+            class: primaryClass,
+            price: jadwal.harga,
+            availableSeats: availableSeats,
+            facilities: facilities
+        };
+    });
 };
 
 function TicketPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const [tickets, setTickets] = useState<TrainTicket[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     
     const ticketSearchParams: TicketSearchParams = {
         origin: searchParams?.get('origin') || '',
@@ -93,11 +92,60 @@ function TicketPageContent() {
         isPulangPergi: searchParams?.get('isPulangPergi') === 'true'
     };
 
-    const tickets = generateSampleTickets(ticketSearchParams);
     const totalPassengers = ticketSearchParams.adults + ticketSearchParams.children;
 
     // Check if we have valid search params
     const hasValidSearch = ticketSearchParams.origin && ticketSearchParams.destination && ticketSearchParams.departureDate;
+
+    // Fetch tickets data from database
+    useEffect(() => {
+        const fetchTickets = async () => {
+            if (!hasValidSearch) {
+                setLoading(false);
+                return;
+            }
+
+            setLoading(true);
+            setError(null);
+
+            try {
+                console.log('Searching for:', {
+                    origin: ticketSearchParams.origin,
+                    destination: ticketSearchParams.destination,
+                    date: ticketSearchParams.departureDate
+                });
+
+                const { data, error } = await searchJadwalKereta(
+                    ticketSearchParams.origin,
+                    ticketSearchParams.destination,
+                    ticketSearchParams.departureDate
+                );
+
+                console.log('Database response:', { data, error });
+
+                if (error) {
+                    console.error('Database error:', error);
+                    setError('Gagal mengambil data jadwal kereta. Periksa koneksi database.');
+                    setTickets([]);
+                } else if (data && data.length > 0) {
+                    console.log('Found', data.length, 'tickets from database');
+                    const convertedTickets = convertJadwalToTrainTicket(data);
+                    setTickets(convertedTickets);
+                } else {
+                    console.log('No data found in database');
+                    setTickets([]);
+                }
+            } catch (err) {
+                console.error('Error fetching tickets:', err);
+                setError('Terjadi kesalahan saat mengambil data jadwal kereta.');
+                setTickets([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchTickets();
+    }, [ticketSearchParams.origin, ticketSearchParams.destination, ticketSearchParams.departureDate, hasValidSearch]);
 
     const formatPrice = (price: number) => {
         return new Intl.NumberFormat('id-ID', {
@@ -283,7 +331,50 @@ function TicketPageContent() {
                 </Card>
 
                 <div className="space-y-4">
-                    {tickets.map((ticket) => (
+                    {loading ? (
+                        <Card className="shadow-lg border border-gray-200 bg-white">
+                            <CardContent className="p-8 text-center">
+                                <div className="flex items-center justify-center gap-3">
+                                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                                    <span className="text-gray-700 font-medium">Mencari jadwal kereta...</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : error ? (
+                        <Card className="shadow-lg border border-red-200 bg-red-50">
+                            <CardContent className="p-8 text-center">
+                                <div className="text-red-700 font-medium mb-2">❌ Database Error</div>
+                                <div className="text-red-600 text-sm mb-4">{error}</div>
+                                <div className="text-gray-600 text-xs mb-4">
+                                    Pastikan database sudah ter-setup dengan benar dan memiliki data jadwal kereta.
+                                </div>
+                                <Button 
+                                    onClick={() => window.location.reload()}
+                                    variant="outline"
+                                    className="border-red-300 text-red-700 hover:bg-red-100"
+                                >
+                                    Coba Lagi
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    ) : tickets.length === 0 ? (
+                        <Card className="shadow-lg border border-gray-200 bg-white">
+                            <CardContent className="p-8 text-center">
+                                <Train className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                                <div className="text-gray-700 font-medium mb-2">Tidak ada jadwal kereta ditemukan</div>
+                                <div className="text-gray-500 text-sm mb-4">
+                                    Tidak ada kereta yang beroperasi untuk rute {ticketSearchParams.origin} → {ticketSearchParams.destination} pada tanggal yang dipilih.
+                                </div>
+                                <Button 
+                                    onClick={() => router.push('/')}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                                >
+                                    Coba Rute Lain
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        tickets.map((ticket: TrainTicket) => (
                         <Card key={ticket.id} className="group shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden">
                             <CardContent className="p-0">
                                 {/* Header Section - Simplified */}
@@ -365,13 +456,7 @@ function TicketPageContent() {
                                         <div className="lg:col-span-1 flex flex-col justify-center items-center space-y-4">
                                             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 rounded-xl w-full text-center">
                                                 <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                                                    {formatPrice(ticket.price * totalPassengers)}
-                                                </div>
-                                                <div className="text-sm text-gray-600 mt-1 font-medium">
-                                                    {totalPassengers} {totalPassengers === 1 ? 'penumpang' : 'penumpang'}
-                                                </div>
-                                                <div className="text-xs text-gray-500 mt-1">
-                                                    {formatPrice(ticket.price)} per orang
+                                                    {formatPrice(ticket.price)}
                                                 </div>
                                             </div>
                                             <Button 
@@ -406,25 +491,9 @@ function TicketPageContent() {
                                 </div>
                             </CardContent>
                         </Card>
-                    ))}
+                    ))
+                    )}
                 </div>
-
-                {/* No tickets found */}
-                {tickets.length === 0 && (
-                    <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-md">
-                        <CardContent className="text-center py-12">
-                            <div className="text-gray-400 mb-4">
-                                <Clock className="w-16 h-16 mx-auto" />
-                            </div>
-                            <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                                Tidak ada kereta tersedia
-                            </h3>
-                            <p className="text-gray-600">
-                                Coba ubah tanggal keberangkatan atau rute perjalanan
-                            </p>
-                        </CardContent>
-                    </Card>
-                )}
             </div>
         </div>
     );

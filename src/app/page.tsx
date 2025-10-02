@@ -17,6 +17,8 @@ export default function Home() {
     }, []);
 
     return (
+        
+        
         <div className="h-screen overflow-hidden bg-white">
             <main className="flex h-screen">
                 <div className="grid lg:grid-cols-2 w-full h-full">
