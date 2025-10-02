@@ -374,7 +374,10 @@ function TicketPageContent() {
                                                     {formatPrice(ticket.price)} per orang
                                                 </div>
                                             </div>
-                                            <Button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 group">
+                                            <Button 
+                                                onClick={() => router.push('/orders')}
+                                                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 group"
+                                            >
                                                 <span>Pilih Kereta</span>
                                                 <ChevronRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                                             </Button>
