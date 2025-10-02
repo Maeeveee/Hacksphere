@@ -52,28 +52,7 @@ interface TicketData {
   isPulangPergi: boolean;
 }
 
-// Sample ticket data for fallback
-const getSampleTicketData = (): TicketData => ({
-  trainId: "1",
-  trainName: "Argo Parahyangan",
-  trainNumber: "ARGO 205",
-  origin: "Jakarta",
-  destination: "Bandung",
-  departureTime: "08:00",
-  arrivalTime: "11:30",
-  duration: "3h 30m",
-  class: "Eksekutif",
-  price: 200000,
-  facilities: ["WiFi", "AC", "Makanan"],
-  availableSeats: 50,
-  passengers: 1,
-  adults: 1,
-  children: 0,
-  departureDate: "2024-01-15",
-  totalPrice: 200000,
-  isDifabel: false,
-  isPulangPergi: false
-});
+
 
 function OrderFormContent() {
   const router = useRouter();
@@ -93,12 +72,49 @@ function OrderFormContent() {
   const [passengersData, setPassengersData] = useState<PassengerData[]>([]);
   const [useBookingDataForPassenger, setUseBookingDataForPassenger] = useState(false);
 
-  // Load ticket data from URL params
+  // Load ticket data from URL params or localStorage
   useEffect(() => {
+    // First check if there's existing order data in localStorage (from payment page navigation back)
+    const existingOrderData = localStorage.getItem('orderData');
+    if (existingOrderData) {
+      try {
+        const parsedData = JSON.parse(existingOrderData);
+        if (parsedData.ticketData && parsedData.bookingData && parsedData.passengersData) {
+          // Additional validation for ticket data completeness
+          const ticketData = parsedData.ticketData;
+          if (ticketData.trainName && ticketData.origin && ticketData.destination && 
+              ticketData.departureTime && ticketData.price && ticketData.departureDate) {
+            setTicketData(parsedData.ticketData);
+            setBookingData(parsedData.bookingData);
+            setPassengersData(parsedData.passengersData);
+            setUseBookingDataForPassenger(parsedData.useBookingDataForPassenger || false);
+            return; // Exit early if data loaded from localStorage
+          } else {
+            console.error('Incomplete ticket data in localStorage');
+            localStorage.removeItem('orderData');
+          }
+        }
+      } catch (error) {
+        console.error('Error loading existing order data:', error);
+        localStorage.removeItem('orderData');
+      }
+    }
+
+    // Otherwise, load from URL params
     const ticketDataParam = searchParams?.get('ticketData');
     if (ticketDataParam) {
       try {
         const parsedTicketData = JSON.parse(decodeURIComponent(ticketDataParam));
+        
+        // Validate required ticket data fields
+        if (!parsedTicketData.trainName || !parsedTicketData.origin || !parsedTicketData.destination || 
+            !parsedTicketData.departureTime || !parsedTicketData.price || !parsedTicketData.departureDate) {
+          console.error('Incomplete ticket data from URL params');
+          alert('Data tiket tidak lengkap. Silakan pilih tiket kembali.');
+          router.push('/tickets');
+          return;
+        }
+        
         setTicketData(parsedTicketData);
         
         // Initialize passengers data based on ticket data
@@ -129,28 +145,30 @@ function OrderFormContent() {
         setPassengersData(passengers);
       } catch (error) {
         console.error('Error parsing ticket data:', error);
-        // Fallback to sample data
-        setTicketData(getSampleTicketData());
-        setPassengersData([{
-          gender: "",
-          nama: "",
-          tipeIdentitas: "",
-          nomorIdentitas: "",
-          ageCategory: 'adult'
-        }]);
+        // Redirect back to tickets page if data is invalid
+        alert('Data tiket tidak valid. Silakan pilih tiket kembali.');
+        router.push('/tickets');
+        return;
       }
     } else {
-      // Fallback to sample data
-      setTicketData(getSampleTicketData());
-      setPassengersData([{
-        gender: "",
-        nama: "",
-        tipeIdentitas: "",
-        nomorIdentitas: "",
-        ageCategory: 'adult'
-      }]);
+      // No ticket data found, redirect to tickets page
+      console.log('No ticket data found, redirecting to tickets page');
+      router.push('/tickets');
+      return;
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
+
+  // Add timeout to redirect if no ticket data is loaded
+  useEffect(() => {
+    if (!ticketData) {
+      const timeout = setTimeout(() => {
+        console.log('Timeout: No ticket data loaded, redirecting to tickets page');
+        router.push('/tickets');
+      }, 5000); // 5 seconds timeout
+
+      return () => clearTimeout(timeout);
+    }
+  }, [ticketData, router]);
 
   // Handle auto-fill checkbox
   const handleAutoFillChange = (checked: boolean) => {
@@ -169,8 +187,32 @@ function OrderFormContent() {
     }
   };
 
+  // Input validation function
+  const validateInput = (field: string, value: string): string => {
+    switch (field) {
+      case 'nomorIdentitas':
+        // Only allow numbers for identity numbers
+        return value.replace(/[^0-9]/g, '');
+      case 'noHP':
+        // Only allow numbers and plus sign for phone numbers
+        return value.replace(/[^0-9+]/g, '');
+      case 'email':
+        // Allow email characters (letters, numbers, @, ., -, _)
+        return value.replace(/[^a-zA-Z0-9@._-]/g, '').toLowerCase();
+      case 'nama':
+        // Only allow letters and spaces for names
+        return value.replace(/[^a-zA-Z\s]/g, '');
+      case 'alamat':
+        // Allow letters, numbers, spaces, and common punctuation for addresses
+        return value.replace(/[^a-zA-Z0-9\s.,/-]/g, '');
+      default:
+        return value;
+    }
+  };
+
   const handleBookingDataChange = (field: keyof BookingFormData, value: string) => {
-    setBookingData(prev => ({ ...prev, [field]: value }));
+    const validatedValue = validateInput(field, value);
+    setBookingData(prev => ({ ...prev, [field]: validatedValue }));
     
     // Auto-update first passenger data if checkbox is checked
     if (useBookingDataForPassenger && passengersData.length > 0) {
@@ -179,7 +221,7 @@ function OrderFormContent() {
         const updatedPassengers = [...passengersData];
         updatedPassengers[0] = {
           ...updatedPassengers[0],
-          [field]: value
+          [field]: validatedValue
         };
         setPassengersData(updatedPassengers);
       }
@@ -189,15 +231,22 @@ function OrderFormContent() {
   const handlePassengerDataChange = (passengerIndex: number, field: keyof PassengerData, value: string) => {
     if (field === 'ageCategory') return; // Age category is set automatically
     
+    const validatedValue = validateInput(field, value);
     const updatedPassengers = [...passengersData];
     updatedPassengers[passengerIndex] = {
       ...updatedPassengers[passengerIndex],
-      [field]: value
+      [field]: validatedValue
     };
     setPassengersData(updatedPassengers);
   };
 
   const handleProceedToPayment = () => {
+    // Validate ticket data exists
+    if (!ticketData) {
+      alert("Data tiket tidak ditemukan. Silakan pilih tiket kembali.");
+      router.push('/tickets');
+      return;
+    }
     
     if (!bookingData.nama.trim()) {
       alert("Mohon isi nama pemesan");
@@ -211,15 +260,32 @@ function OrderFormContent() {
       alert("Mohon isi nomor identitas");
       return;
     }
+    if (bookingData.tipeIdentitas === 'nik' && bookingData.nomorIdentitas.length !== 16) {
+      alert("NIK harus terdiri dari 16 digit");
+      return;
+    }
     if (!bookingData.noHP.trim()) {
       alert("Mohon isi nomor HP");
+      return;
+    }
+    if (bookingData.noHP.length < 10 || bookingData.noHP.length > 15) {
+      alert("Nomor HP harus terdiri dari 10-15 digit");
       return;
     }
     if (!bookingData.email.trim()) {
       alert("Mohon isi email");
       return;  
     }
-    router.push('/orders/payment');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingData.email)) {
+      alert("Format email tidak valid");
+      return;
+    }
+
+    // Validate passengers data exists
+    if (!passengersData || passengersData.length === 0) {
+      alert("Data penumpang tidak ditemukan. Silakan refresh halaman.");
+      return;
+    }
     
     // Validasi data semua penumpang
     for (let i = 0; i < passengersData.length; i++) {
@@ -240,6 +306,10 @@ function OrderFormContent() {
         alert(`Mohon isi nomor identitas penumpang ${i + 1}`);
         return;
       }
+      if (passenger.tipeIdentitas === 'nik' && passenger.nomorIdentitas.length !== 16) {
+        alert(`NIK penumpang ${i + 1} harus terdiri dari 16 digit`);
+        return;
+      }
     }
 
     // Prepare data untuk payment
@@ -250,8 +320,18 @@ function OrderFormContent() {
       useBookingDataForPassenger
     };
 
-    console.log("Order Data:", orderData);
-    alert("Data berhasil disimpan! Lanjut ke pembayaran...");
+    try {
+      // Store order data in localStorage for payment page
+      localStorage.setItem('orderData', JSON.stringify(orderData));
+      
+      console.log("Order Data:", orderData);
+      
+      // Navigate to payment page
+      router.push('/orders/payment');
+    } catch (error) {
+      console.error('Error saving order data:', error);
+      alert('Terjadi kesalahan saat menyimpan data. Silakan coba lagi.');
+    }
   };
 
   const formatPrice = (price: number) => {
@@ -301,6 +381,13 @@ function OrderFormContent() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Memuat data tiket...</p>
+          <p className="mt-2 text-sm text-gray-500">Jika halaman tidak termuat dalam 5 detik, Anda akan diarahkan ke halaman pilih tiket</p>
+          <button 
+            onClick={() => router.push('/tickets')} 
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+          >
+            Pilih Tiket Kembali
+          </button>
         </div>
       </div>
     );
@@ -360,11 +447,14 @@ function OrderFormContent() {
                     <Label htmlFor="booker-name" className="text-sm font-medium text-gray-700">Nama Pemesan</Label>
                     <Input
                       id="booker-name"
+                      type="text"
                       value={bookingData.nama}
                       onChange={(e) => handleBookingDataChange('nama', e.target.value)}
                       placeholder="Masukkan nama lengkap"
                       className="mt-1"
+                      maxLength={50}
                     />
+                    <p className="text-xs text-gray-500 mt-1">Hanya huruf dan spasi</p>
                   </div>
                 </div>
 
@@ -385,11 +475,16 @@ function OrderFormContent() {
                     <Label htmlFor="booker-id-number" className="text-sm font-medium text-gray-700">Nomor Identitas</Label>
                     <Input
                       id="booker-id-number"
+                      type="text"
                       value={bookingData.nomorIdentitas}
                       onChange={(e) => handleBookingDataChange('nomorIdentitas', e.target.value)}
                       placeholder="Masukkan nomor identitas"
                       className="mt-1"
+                      maxLength={20}
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {bookingData.tipeIdentitas === 'nik' ? 'NIK: 16 digit angka' : 'Hanya angka'}
+                    </p>
                   </div>
                 </div>
 
@@ -397,11 +492,15 @@ function OrderFormContent() {
                   <Label htmlFor="booker-phone" className="text-sm font-medium text-gray-700">No. HP Pemesan</Label>
                   <Input
                     id="booker-phone"
+                    type="tel"
                     value={bookingData.noHP}
                     onChange={(e) => handleBookingDataChange('noHP', e.target.value)}
                     placeholder="Contoh: 081234567890"
                     className="mt-1"
+                    maxLength={15}
+                    minLength={10}
                   />
+                  <p className="text-xs text-gray-500 mt-1">Format: 10-15 digit angka</p>
                 </div>
 
                 <div>
@@ -492,12 +591,17 @@ function OrderFormContent() {
                       <Label htmlFor={`passenger-${index}-name`} className="text-sm font-medium text-gray-700">Nama Penumpang</Label>
                       <Input
                         id={`passenger-${index}-name`}
+                        type="text"
                         value={passenger.nama}
                         onChange={(e) => handlePassengerDataChange(index, 'nama', e.target.value)}
                         disabled={useBookingDataForPassenger && index === 0}
                         placeholder="Masukkan nama lengkap"
                         className={`mt-1 ${useBookingDataForPassenger && index === 0 ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        maxLength={50}
                       />
+                      {!(useBookingDataForPassenger && index === 0) && (
+                        <p className="text-xs text-gray-500 mt-1">Hanya huruf dan spasi</p>
+                      )}
                     </div>
                   </div>
 
@@ -525,12 +629,19 @@ function OrderFormContent() {
                       <Label htmlFor={`passenger-${index}-id-number`} className="text-sm font-medium text-gray-700">Nomor Identitas</Label>
                       <Input
                         id={`passenger-${index}-id-number`}
+                        type="text"
                         value={passenger.nomorIdentitas}
                         onChange={(e) => handlePassengerDataChange(index, 'nomorIdentitas', e.target.value)}
                         disabled={useBookingDataForPassenger && index === 0}
                         placeholder="Masukkan nomor identitas"
                         className={`mt-1 ${useBookingDataForPassenger && index === 0 ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        maxLength={20}
                       />
+                      {!(useBookingDataForPassenger && index === 0) && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {passenger.tipeIdentitas === 'nik' ? 'NIK: 16 digit angka' : 'Hanya angka'}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -595,7 +706,9 @@ function OrderFormContent() {
                 <div className="p-4 border-b border-gray-100">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1 min-w-0 pr-3">
-                      <h3 className="font-bold text-lg text-gray-800 mb-1 break-words leading-tight">{ticketData.trainName}</h3>
+                      <h3 className="font-bold text-lg text-gray-800 mb-1 break-words leading-tight">
+                        {ticketData.trainName || 'Nama Kereta Tidak Tersedia'}
+                      </h3>
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge className={`${getClassBadgeColor(ticketData.class)} font-medium text-xs px-2 py-1`}>
                           {ticketData.class}
@@ -619,8 +732,8 @@ function OrderFormContent() {
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3">
                     <div className="flex items-center justify-between">
                       <div className="text-center flex-1 min-w-0">
-                        <div className="text-xl font-bold text-gray-800">{ticketData.departureTime}</div>
-                        <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{ticketData.origin}</div>
+                        <div className="text-xl font-bold text-gray-800">{ticketData.departureTime || '--:--'}</div>
+                        <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{ticketData.origin || 'Stasiun Asal'}</div>
                       </div>
                       <div className="flex-shrink-0 mx-2 flex items-center justify-center">
                         <div className="flex items-center gap-1 text-xs text-gray-600">
@@ -630,8 +743,8 @@ function OrderFormContent() {
                         </div>
                       </div>
                       <div className="text-center flex-1 min-w-0">
-                        <div className="text-xl font-bold text-gray-800">{ticketData.arrivalTime}</div>
-                        <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{ticketData.destination}</div>
+                        <div className="text-xl font-bold text-gray-800">{ticketData.arrivalTime || '--:--'}</div>
+                        <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{ticketData.destination || 'Stasiun Tujuan'}</div>
                       </div>
                     </div>
                     <div className="text-center text-xs text-gray-600 mt-2">

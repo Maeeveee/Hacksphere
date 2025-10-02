@@ -18,7 +18,7 @@ export default function MediaSection() {
       const handleError = () => {
         setVideoError(true);
         setVideoLoaded(false);
-        console.error('Video failed to load:', '/preview.mp4');
+        console.error('Video failed to load:', '/background.mp4');
       };
 
       video.addEventListener('loadeddata', handleLoadedData);
@@ -49,7 +49,7 @@ export default function MediaSection() {
           style={{ display: videoError ? 'none' : 'block' }}
         >
           <source 
-            src="/preview.mp4" 
+            src="/background.mp4" 
             type="video/mp4" 
           />
           Your browser does not support the video tag.
@@ -77,18 +77,12 @@ export default function MediaSection() {
               </p>
               {videoError && (
                 <p className="text-gray-400 text-xs mt-2">
-                  Pastikan file preview.mp4 ada di folder public
+                  Pastikan file background.mp4 ada di folder public
                 </p>
               )}
             </div>
           </div>
         )}
-
-        {/* Optional: Dark overlay for better text readability */}
-        {videoLoaded && !videoError && (
-          <div className="absolute inset-0 bg-black bg-opacity-20 pointer-events-none"></div>
-        )}
-    
       </div>
     </div>
   );
