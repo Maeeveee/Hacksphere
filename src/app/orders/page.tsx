@@ -124,6 +124,8 @@ function OrderFormContent() {
   };
 
   const handleProceedToPayment = () => {
+    // router
+    router.push(`/orders/payment`);
     // Validasi form
     if (!bookingData.nama.trim()) {
       alert("Mohon isi nama pemesan");
