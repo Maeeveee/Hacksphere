@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import StasiunSelector from "@/components/stasiunSelector";
 
 interface BookingData {
     origin: string;
@@ -104,14 +105,11 @@ export default function BookingForm() {
                             <Label htmlFor="origin" className="text-sm font-semibold text-gray-800">
                                 Stasiun Asal
                             </Label>
-                            <Input
-                                id="origin"
-                                type="text"
-                                placeholder="Jakarta Gambir"
+                            <StasiunSelector
                                 value={bookingData.origin}
-                                onChange={(e) => handleInputChange("origin", e.target.value)}
-                                className="w-full h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white"
-                                required
+                                onChange={(value) => handleInputChange("origin", value)}
+                                placeholder="Cari stasiun asal..."
+                                className="w-full"
                             />
                         </div>
 
@@ -120,14 +118,11 @@ export default function BookingForm() {
                             <Label htmlFor="destination" className="text-sm font-semibold text-gray-800">
                                 Stasiun Tujuan
                             </Label>
-                            <Input
-                                id="destination"
-                                type="text"
-                                placeholder="Bandung"
+                            <StasiunSelector
                                 value={bookingData.destination}
-                                onChange={(e) => handleInputChange("destination", e.target.value)}
-                                className="w-full h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white"
-                                required
+                                onChange={(value) => handleInputChange("destination", value)}
+                                placeholder="Cari stasiun tujuan..."
+                                className="w-full"
                             />
                         </div>
 
