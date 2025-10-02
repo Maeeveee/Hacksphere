@@ -9,6 +9,44 @@ export interface Stasiun {
   dibuat_pada: string;  // timestamptz
 }
 
+// TypeScript interface untuk tabel kereta
+export interface Kereta {
+  id: string;           // uuid
+  nama_kereta: string;  // varchar
+  kode_kereta: string;  // varchar
+  dibuat_pada: string;  // timestamptz
+}
+
+// TypeScript interface untuk tabel gerbong
+export interface Gerbong {
+  id: string;           // uuid
+  id_kereta: string;    // uuid foreign key
+  nomor_gerbong: number;// integer
+  nama_kelas: string;   // varchar (Eksekutif, Bisnis, Ekonomi)
+  dibuat_pada: string;  // timestamptz
+}
+
+// TypeScript interface untuk tabel jadwal
+export interface Jadwal {
+  id: string;              // uuid
+  id_kereta: string;       // uuid foreign key
+  id_stasiun_asal: string; // uuid foreign key
+  id_stasiun_tujuan: string; // uuid foreign key
+  waktu_berangkat: string; // timestamptz
+  waktu_tiba: string;      // timestamptz
+  harga: number;           // numeric(10,2)
+  dibuat_pada: string;     // timestamptz
+}
+
+// Extended interface untuk joined data
+export interface JadwalLengkap extends Jadwal {
+  kereta: Kereta & {
+    gerbong: Gerbong[];
+  };
+  stasiun_asal: Stasiun;
+  stasiun_tujuan: Stasiun;
+}
+
 // Response type untuk queries
 export type StasiunResponse = {
   data: Stasiun[] | null;
@@ -17,6 +55,11 @@ export type StasiunResponse = {
 
 export type SingleStasiunResponse = {
   data: Stasiun | null;
+  error: any;
+};
+
+export type JadwalResponse = {
+  data: JadwalLengkap[] | null;
   error: any;
 };
 
@@ -177,4 +220,79 @@ export async function getStasiunWithPagination(
     .range(from, to);
 
   return { data, error, count };
+}
+
+/**
+ * Mencari jadwal kereta berdasarkan stasiun asal dan tujuan
+ */
+export async function searchJadwalKereta(
+  stasiunAsal: string,
+  stasiunTujuan: string,
+  tanggalBerangkat?: string
+): Promise<JadwalResponse> {
+  const supabase = createClient();
+  
+  // First, get stasiun IDs
+  const { data: stasiunAsalData } = await supabase
+    .from('stasiun')
+    .select('id')
+    .eq('nama_stasiun', stasiunAsal)
+    .single();
+    
+  const { data: stasiunTujuanData } = await supabase
+    .from('stasiun')
+    .select('id')
+    .eq('nama_stasiun', stasiunTujuan)
+    .single();
+
+  if (!stasiunAsalData || !stasiunTujuanData) {
+    return { data: null, error: 'Stasiun tidak ditemukan' };
+  }
+
+  // For new database structure, we search based on datetime (not day of week)
+  let query = supabase
+    .from('jadwal')
+    .select(`
+      *,
+      kereta:id_kereta (
+        id,
+        nama_kereta,
+        kode_kereta,
+        gerbong (
+          id,
+          nomor_gerbong,
+          nama_kelas
+        )
+      ),
+      stasiun_asal:id_stasiun_asal (
+        id,
+        nama_stasiun,
+        kode_stasiun,
+        kota
+      ),
+      stasiun_tujuan:id_stasiun_tujuan (
+        id,
+        nama_stasiun,
+        kode_stasiun,
+        kota
+      )
+    `)
+    .eq('id_stasiun_asal', stasiunAsalData.id)
+    .eq('id_stasiun_tujuan', stasiunTujuanData.id)
+    .order('waktu_berangkat', { ascending: true });
+
+  // Filter by date if provided
+  if (tanggalBerangkat) {
+    const startDate = new Date(tanggalBerangkat);
+    const endDate = new Date(tanggalBerangkat);
+    endDate.setDate(endDate.getDate() + 1);
+    
+    query = query
+      .gte('waktu_berangkat', startDate.toISOString())
+      .lt('waktu_berangkat', endDate.toISOString());
+  }
+
+  const { data, error } = await query;
+
+  return { data: data as JadwalLengkap[], error };
 }
