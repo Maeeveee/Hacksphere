@@ -50,7 +50,7 @@ export default function OrderSummary({ order }: OrderSummaryProps) {
   return (
     <div className="w-full max-w-sm mx-auto shadow-xl border border-slate-200/60 overflow-hidden rounded-xl">
       {/* Header Biru */}
-      <div className="bg-blue-500 text-white p-5">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-5">
         <h2 className="text-2xl font-bold">Total {formatCurrency(order.totalPrice)}</h2>
       </div>
 
