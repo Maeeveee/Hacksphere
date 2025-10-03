@@ -6,8 +6,8 @@ import PaymentInstructions from '@/components/PaymentInstruction';
 import TicketDisplay from '@/components/TicketDisplay';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-import { saveTiket, updatePaymentStatus, type Tiket, type TiketQRData } from '@/lib/supabase/queries';
 import { CheckCircle2 } from 'lucide-react';
+import { saveBookingLengkap, updatePaymentStatus, type SaveBookingRequest, type TiketQRData } from '@/lib/supabase/queries';
 
 interface BookingFormData {
   gender: string;
@@ -63,6 +63,7 @@ interface PaymentData {
   bookingCode?: string;
   paymentDeadline?: number;
   bankName?: string;
+  paymentStatus?: 'menunggu_pembayaran' | 'terkonfirmasi' | 'dibatalkan' | 'kadaluarsa';
 }
 
 // Function to generate a booking code
@@ -187,7 +188,8 @@ function PaymentConfirmationContent() {
                         paymentCode: specificPaymentCode,
                         bookingCode: bookingCode,
                         paymentDeadline: paymentDeadlineInSeconds,
-                        bankName: bankName
+                        bankName: bankName,
+                        paymentStatus: 'menunggu_pembayaran' // Set status awal sebagai menunggu_pembayaran
                     };
                     
                     setPaymentData(payment);
@@ -240,85 +242,130 @@ function PaymentConfirmationContent() {
         };
     }, [router, searchParams, paymentCode, bookingCode, paymentDeadlineInSeconds, isPaid]);
 
-    // Fungsi untuk menyimpan data tiket ke database
+    // Fungsi untuk menyimpan data tiket ke database Supabase
     const saveTicketToDatabase = async (paymentData: PaymentData) => {
         try {
-            const { orderData, bookingCode: bCode, paymentCode: pCode } = paymentData;
-            const { ticketData, bookingData, passengersData } = orderData;
-
-            // Siapkan data lengkap untuk disimpan di data_qr_code
-            const qrCodeData: TiketQRData = {
-                // Booking Info
-                booking_code: bCode || bookingCode,
-                payment_code: pCode,
-                payment_deadline: new Date(Date.now() + ((paymentData.paymentDeadline || paymentDeadlineInSeconds) * 1000)).toISOString(),
-                
-                // Data Kereta
-                train_id: ticketData.trainId,
-                train_name: ticketData.trainName,
-                train_number: ticketData.trainNumber,
-                train_class: ticketData.class,
-                
-                // Rute & Jadwal
-                origin: ticketData.origin,
-                destination: ticketData.destination,
-                departure_date: ticketData.departureDate,
-                departure_time: ticketData.departureTime,
-                arrival_time: ticketData.arrivalTime,
-                duration: ticketData.duration,
-                
-                // Data Pemesan
-                booker_name: bookingData.nama,
-                booker_gender: bookingData.gender,
-                booker_identity_type: bookingData.tipeIdentitas,
-                booker_identity_number: bookingData.nomorIdentitas,
-                booker_phone: bookingData.noHP,
-                booker_email: bookingData.email,
-                booker_address: bookingData.alamat,
-                
-                // Data Penumpang
-                passengers_data: passengersData,
-                passenger_count: ticketData.passengers,
-                adult_count: ticketData.adults,
-                child_count: ticketData.children,
-                
-                // Harga
-                price_per_ticket: ticketData.price,
-                total_price: ticketData.totalPrice,
-                
-                // Status
-                payment_status: 'pending',
-                booking_status: 'active',
-                
-                // QR Code URL
-                qr_code_url: `http://localhost:3000/booking-code/${bCode || bookingCode}`,
-                
-                // Tambahan (jika ada)
-                facilities: ticketData.facilities || [],
-                payment_method: paymentData.paymentMethod || 'transfer',
-                payment_bank: paymentData.bankName || 'Bank'
-            };
-
-            // Data untuk insert ke tabel tiket
-            const tiketData: Omit<Tiket, 'id' | 'dibuat_pada'> = {
-                id_penumpang: undefined, // Will be set if you have penumpang table
-                id_jadwal: ticketData.trainId, // Assuming this is jadwal ID
-                id_kursi: undefined, // Will be set if you have kursi table
-                data_qr_code: JSON.stringify(qrCodeData)
-            };
-
-            const { data, error } = await saveTiket(tiketData);
+            console.log('Starting to save booking to database...');
             
-            if (error) {
-                console.error('Error saving ticket to database:', error);
+            // Validasi data yang diperlukan
+            if (!paymentData.bookingCode) {
+                console.error('Booking code is required');
                 return false;
             }
             
-            console.log('Ticket saved successfully:', data);
-            return true;
+            // Convert paymentDeadline (duration in seconds) to actual deadline timestamp
+            const deadlineString = paymentData.paymentDeadline 
+                ? new Date(Date.now() + paymentData.paymentDeadline * 1000).toISOString()
+                : undefined;
+            
+            console.log('💰 Payment deadline:', {
+                durationSeconds: paymentData.paymentDeadline,
+                deadlineISO: deadlineString
+            });
+            
+            // Siapkan data QR Code
+            const qrCodeData: TiketQRData = {
+                // Booking Info
+                booking_code: paymentData.bookingCode,
+                payment_code: paymentData.paymentCode,
+                payment_deadline: deadlineString,
+                
+                // Data Kereta
+                train_name: paymentData.orderData.ticketData.trainName,
+                train_number: paymentData.orderData.ticketData.trainNumber,
+                train_class: paymentData.orderData.ticketData.class,
+                
+                // Rute & Jadwal
+                origin: paymentData.orderData.ticketData.origin,
+                destination: paymentData.orderData.ticketData.destination,
+                departure_date: paymentData.orderData.ticketData.departureDate,
+                departure_time: paymentData.orderData.ticketData.departureTime,
+                arrival_time: paymentData.orderData.ticketData.arrivalTime,
+                duration: paymentData.orderData.ticketData.duration,
+                
+                // Data Pemesan
+                booker_name: paymentData.orderData.bookingData.nama,
+                booker_gender: paymentData.orderData.bookingData.gender,
+                booker_identity_type: paymentData.orderData.bookingData.tipeIdentitas,
+                booker_identity_number: paymentData.orderData.bookingData.nomorIdentitas,
+                booker_phone: paymentData.orderData.bookingData.noHP,
+                booker_email: paymentData.orderData.bookingData.email,
+                booker_address: paymentData.orderData.bookingData.alamat || '',
+                
+                // Data Penumpang
+                passengers_data: paymentData.orderData.passengersData,
+                passenger_count: paymentData.orderData.ticketData.passengers,
+                adult_count: paymentData.orderData.ticketData.adults,
+                child_count: paymentData.orderData.ticketData.children,
+                
+                // Harga
+                price_per_ticket: paymentData.orderData.ticketData.price,
+                total_price: paymentData.orderData.ticketData.totalPrice,
+                
+                // Status
+                payment_status: paymentData.paymentStatus || 'menunggu_pembayaran',
+                
+                // QR Code
+                qr_code_url: `http://localhost:3000/booking-code/${paymentData.bookingCode}`,
+                
+                // Tambahan
+                facilities: paymentData.orderData.ticketData.facilities,
+                payment_method: paymentData.paymentMethod,
+                payment_bank: paymentData.bankName
+            };
+            
+            // Siapkan data penumpang (disabilitas check dari isDifabel)
+            const passengersForDB = paymentData.orderData.passengersData.map((p: any) => ({
+                nama: p.nama,
+                nomorIdentitas: p.nomorIdentitas,
+                disabilitas: paymentData.orderData.ticketData.isDifabel || false, // Ambil dari ticketData
+                selectedSeat: p.selectedSeat
+            }));
+            
+            // Siapkan request untuk save booking
+            const saveRequest: SaveBookingRequest = {
+                bookingCode: paymentData.bookingCode,
+                paymentCode: paymentData.paymentCode,
+                paymentDeadline: deadlineString,
+                totalPrice: paymentData.orderData.ticketData.totalPrice,
+                paymentStatus: paymentData.paymentStatus || 'menunggu_pembayaran',
+                
+                trainName: paymentData.orderData.ticketData.trainName,
+                origin: paymentData.orderData.ticketData.origin,
+                destination: paymentData.orderData.ticketData.destination,
+                departureDate: paymentData.orderData.ticketData.departureDate,
+                departureTime: paymentData.orderData.ticketData.departureTime,
+                
+                passengers: passengersForDB,
+                qrCodeData: qrCodeData
+            };
+            
+            // Simpan ke database
+            const result = await saveBookingLengkap(saveRequest);
+            
+            if (result.success) {
+                console.log('✅ Booking berhasil disimpan ke database!', result.pemesananId);
+                
+                // Tetap simpan ke localStorage juga sebagai backup
+                const existingTickets = localStorage.getItem('ticketHistory');
+                const ticketHistory = existingTickets ? JSON.parse(existingTickets) : [];
+                
+                ticketHistory.push({
+                    bookingCode: paymentData.bookingCode,
+                    createdAt: new Date().toISOString(),
+                    orderData: paymentData.orderData
+                });
+                
+                localStorage.setItem('ticketHistory', JSON.stringify(ticketHistory));
+                
+                return true;
+            } else {
+                console.error('❌ Gagal menyimpan ke database:', result.error);
+                return false;
+            }
             
         } catch (error) {
-            console.error('Error in saveTicketToDatabase:', error);
+            console.error('❌ Error in saveTicketToDatabase:', error);
             return false;
         }
     };
@@ -326,17 +373,32 @@ function PaymentConfirmationContent() {
     const handlePaymentComplete = async () => {
         console.log("Pembayaran Selesai!");
         
-        // Update payment status in database
+        // Update payment status in database dan localStorage
         if (paymentData?.bookingCode) {
             try {
-                const { data, error } = await updatePaymentStatus(paymentData.bookingCode, 'paid');
-                if (error) {
-                    console.error('Error updating payment status:', error);
+                // Update di database
+                console.log('Updating payment status in database...');
+                const { error: dbError } = await updatePaymentStatus(paymentData.bookingCode, 'terkonfirmasi');
+                
+                if (dbError) {
+                    console.error('Error updating payment status in database:', dbError);
                 } else {
-                    console.log('Payment status updated successfully:', data);
+                    console.log('✅ Payment status updated to TERKONFIRMASI in database');
+                }
+                
+                // Update di localStorage
+                const storedPaymentData = localStorage.getItem('paymentData');
+                if (storedPaymentData) {
+                    const parsed = JSON.parse(storedPaymentData);
+                    if (parsed.orderData) {
+                        // Update status ke 'terkonfirmasi'
+                        parsed.paymentStatus = 'terkonfirmasi';
+                        localStorage.setItem('paymentData', JSON.stringify(parsed));
+                        console.log('✅ Payment status updated to TERKONFIRMASI in localStorage');
+                    }
                 }
             } catch (error) {
-                console.error('Error in updatePaymentStatus:', error);
+                console.error('Error updating payment status:', error);
             }
         }
         

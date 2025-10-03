@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Clock, MapPin, Train, Users, CreditCard, Wifi, Utensils, Zap, Bed, Star, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import UserMenu from "@/components/UserMenu";
 import OCRScanner from "@/components/OCRScanner";
+import { randomizeAdjacentSeats, type SeatConfig } from "@/lib/seatUtils";
 
 interface BookingFormData {
   gender: string;
@@ -30,6 +31,7 @@ interface PassengerData {
   tipeIdentitas: string;
   nomorIdentitas: string;
   ageCategory: 'adult' | 'child';
+  selectedSeat?: SeatConfig;
 }
 
 interface TicketData {
@@ -370,6 +372,56 @@ function OrderFormContent() {
         alert(`NIK penumpang ${i + 1} harus terdiri dari 16 digit`);
         return;
       }
+    }
+
+    // Auto-assign seats untuk penumpang yang belum punya selectedSeat
+    const passengersWithSeats = passengersData.map((passenger, index) => {
+      if (!passenger.selectedSeat || !passenger.selectedSeat.seatNumber) {
+        console.log(`🎲 Auto-assigning seat for passenger ${index + 1}: ${passenger.nama}`);
+        return passenger; // Will be assigned later in batch
+      }
+      return passenger;
+    });
+
+    // Get occupied seats from passengers yang sudah pilih
+    const occupiedSeats = passengersData
+      .filter(p => p.selectedSeat && p.selectedSeat.seatNumber)
+      .map(p => p.selectedSeat!.seatNumber);
+
+    // Count passengers yang belum punya seat
+    const passengersNeedingSeats = passengersData.filter(
+      p => !p.selectedSeat || !p.selectedSeat.seatNumber
+    );
+
+    if (passengersNeedingSeats.length > 0) {
+      console.log(`🎲 Auto-assigning ${passengersNeedingSeats.length} seats...`);
+      
+      // Generate random adjacent seats
+      const randomSeats = randomizeAdjacentSeats(
+        ticketData.class,
+        occupiedSeats,
+        passengersNeedingSeats.length
+      );
+
+      if (randomSeats.length < passengersNeedingSeats.length) {
+        alert('Kursi tidak tersedia cukup. Silakan pilih manual atau kurangi jumlah penumpang.');
+        return;
+      }
+
+      // Assign random seats to passengers
+      let seatIndex = 0;
+      passengersData.forEach(passenger => {
+        if (!passenger.selectedSeat || !passenger.selectedSeat.seatNumber) {
+          passenger.selectedSeat = randomSeats[seatIndex];
+          console.log(`✅ Assigned ${randomSeats[seatIndex].seatNumber} to ${passenger.nama}`);
+          seatIndex++;
+        }
+      });
+
+      console.log('🎫 All passengers now have seats:', passengersData.map(p => ({
+        name: p.nama,
+        seat: p.selectedSeat?.seatNumber
+      })));
     }
 
     // Prepare data untuk summary

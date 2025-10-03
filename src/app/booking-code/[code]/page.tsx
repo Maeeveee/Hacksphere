@@ -44,35 +44,73 @@ export default function BookingCodePage() {
       return;
     }
 
-    // Fetch ticket data from database
+    // Get ticket data from database OR localStorage
     const fetchTicketData = async () => {
       try {
-        const { data: tiket, error: dbError } = await getTiketByBookingCode(bookingCode);
+        console.log('🔍 Fetching ticket data for booking code:', bookingCode);
         
-        if (dbError || !tiket) {
-          // Fallback to localStorage if not found in database
-          const storedPaymentData = localStorage.getItem('paymentData');
-          
-          if (storedPaymentData) {
-            const paymentData = JSON.parse(storedPaymentData);
-            
-            if (paymentData.bookingCode === bookingCode) {
-              // Use localStorage data
-              const ticketFromLocalStorage = generateTicketInfoFromLocalStorage(paymentData);
-              setTicketInfo(ticketFromLocalStorage);
-              setIsLoading(false);
-              return;
-            }
-          }
-          
-          setError("Kode booking tidak ditemukan di database");
+        // STEP 1: Coba ambil dari database dulu
+        const { data: dbData, error: dbError } = await getTiketByBookingCode(bookingCode);
+        
+        if (dbData && !dbError) {
+          console.log('✅ Ticket found in DATABASE:', dbData);
+          console.log('📋 Seat info from DB:', {
+            passengers: dbData.passengers_data?.length,
+            seats: dbData.passengers_data?.map((p: any) => p.selectedSeat?.seatNumber)
+          });
+          const ticketInfo = convertTiketToTicketInfo(dbData);
+          console.log('🎫 Converted ticket info:', ticketInfo);
+          setTicketInfo(ticketInfo);
           setIsLoading(false);
           return;
+        } else {
+          console.log('ℹ️ Ticket not found in database, checking localStorage...');
+          if (dbError) {
+            console.log('Database error:', dbError);
+          }
         }
-
-        // Convert database tiket to TicketInfo format
-        const ticketInfo = convertTiketToTicketInfo(tiket);
-        setTicketInfo(ticketInfo);
+        
+        // STEP 2: Kalau tidak ada di database, cek di localStorage (paymentData)
+        const storedPaymentData = localStorage.getItem('paymentData');
+        
+        if (storedPaymentData) {
+          const paymentData = JSON.parse(storedPaymentData);
+          
+          if (paymentData.bookingCode === bookingCode) {
+            console.log('✅ Ticket found in LOCALSTORAGE (paymentData)');
+            const ticketInfo = generateTicketInfoFromLocalStorage(paymentData);
+            setTicketInfo(ticketInfo);
+            setIsLoading(false);
+            return;
+          }
+        }
+        
+        // STEP 3: Cek di ticketHistory (riwayat tiket)
+        const storedHistory = localStorage.getItem('ticketHistory');
+        if (storedHistory) {
+          const ticketHistory = JSON.parse(storedHistory);
+          const foundTicket = ticketHistory.find((t: any) => t.bookingCode === bookingCode);
+          
+          if (foundTicket) {
+            console.log('✅ Ticket found in LOCALSTORAGE (ticketHistory)');
+            // Reconstruct payment data format
+            const paymentData = {
+              bookingCode: foundTicket.bookingCode,
+              orderData: foundTicket.orderData,
+              paymentMethod: foundTicket.orderData?.paymentMethod || 'transfer',
+              bankName: foundTicket.orderData?.bankName || 'Bank'
+            };
+            
+            const ticketInfo = generateTicketInfoFromLocalStorage(paymentData);
+            setTicketInfo(ticketInfo);
+            setIsLoading(false);
+            return;
+          }
+        }
+        
+        // STEP 4: Tidak ditemukan di mana pun
+        console.log('❌ Ticket not found anywhere');
+        setError("Kode booking tidak ditemukan. Silakan lakukan pembayaran terlebih dahulu.");
         setIsLoading(false);
         
       } catch (err) {
@@ -85,7 +123,7 @@ export default function BookingCodePage() {
     fetchTicketData();
   }, [bookingCode]);
 
-  // Helper function to convert TiketQRData to TicketInfo
+  // Helper function to convert TiketQRData (from database) to TicketInfo
   const convertTiketToTicketInfo = (tiket: TiketQRData): TicketInfo => {
     const getStationCode = (stationName: string): string => {
       const stationCodes: { [key: string]: string } = {
@@ -124,6 +162,20 @@ export default function BookingCodePage() {
       };
       return seatNumbers[className] || 'N/A';
     };
+    
+    // Fungsi untuk mendapatkan seat number dari passengers_data
+    const getActualSeatNumbers = (passengersData: any[]): string => {
+      if (!passengersData || passengersData.length === 0) {
+        return 'N/A';
+      }
+      
+      const seats = passengersData
+        .map(p => p.selectedSeat?.seatNumber)
+        .filter(s => s)
+        .join(', ');
+      
+      return seats || 'N/A';
+    };
 
     const originCode = getStationCode(tiket.origin);
     const destinationCode = getStationCode(tiket.destination);
@@ -145,7 +197,7 @@ export default function BookingCodePage() {
       departureDate: formatDateTime(tiket.departure_date, tiket.departure_time),
       arrivalDate: formatDateTime(tiket.departure_date, tiket.arrival_time),
       seatClass: `${tiket.train_class} (${tiket.train_class.substring(0, 3).toUpperCase()})`,
-      seatNumber: getSeatInfo(tiket.train_class),
+      seatNumber: getActualSeatNumbers(passengersData), // Ambil seat number asli dari JSON
       qrCodeValue: tiket.qr_code_url || `http://localhost:3000/booking-code/${tiket.booking_code}`,
       paymentStatus: tiket.payment_status,
       totalPrice: tiket.total_price,
