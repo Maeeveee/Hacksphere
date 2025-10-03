@@ -37,7 +37,7 @@ export default function PaymentInstructions({ paymentCode, deadlineSeconds, onPa
 
     return (
         <div className="shadow-xl border-0 bg-white/95 backdrop-blur-md text-center rounded-lg overflow-hidden">
-            <div className="bg-blue-500 text-white p-6">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
                 <h2 className="text-2xl font-bold">Selesaikan Pembayaran</h2>
                 <p className="text-blue-100 mt-2">
                     Segera lakukan pembayaran sebelum batas waktu berakhir.
