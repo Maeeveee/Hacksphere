@@ -255,7 +255,7 @@ function OrderFormContent() {
   };
 
   // OCR data extraction handler
-  const handleOCRDataExtracted = (passengerIndex: number, ocrData: { nama?: string; nomorIdentitas?: string; tipeIdentitas?: 'nik' | 'paspor' }) => {
+  const handleOCRDataExtracted = (passengerIndex: number, ocrData: { nama?: string; nomorIdentitas?: string; tipeIdentitas?: 'nik' | 'paspor'; gender?: string }) => {
     const updatedPassengers = [...passengersData];
     const currentPassenger = updatedPassengers[passengerIndex];
     
@@ -269,16 +269,16 @@ function OrderFormContent() {
     if (ocrData.tipeIdentitas) {
       currentPassenger.tipeIdentitas = ocrData.tipeIdentitas;
     }
+    if (ocrData.gender) {
+      currentPassenger.gender = ocrData.gender;
+    }
     
     updatedPassengers[passengerIndex] = currentPassenger;
     setPassengersData(updatedPassengers);
-    
-    // Show success message
-    alert(`Data berhasil diekstrak untuk penumpang ${passengerIndex + 1}!`);
   };
 
   // OCR data extraction handler for booking data
-  const handleBookingOCRDataExtracted = (ocrData: { nama?: string; nomorIdentitas?: string; tipeIdentitas?: 'nik' | 'paspor' }) => {
+  const handleBookingOCRDataExtracted = (ocrData: { nama?: string; nomorIdentitas?: string; tipeIdentitas?: 'nik' | 'paspor'; gender?: string }) => {
     const updatedBookingData = { ...bookingData };
     
     // Update booking data with OCR results
@@ -291,6 +291,9 @@ function OrderFormContent() {
     if (ocrData.tipeIdentitas) {
       updatedBookingData.tipeIdentitas = ocrData.tipeIdentitas;
     }
+    if (ocrData.gender) {
+      updatedBookingData.gender = ocrData.gender;
+    }
     
     setBookingData(updatedBookingData);
     
@@ -302,12 +305,10 @@ function OrderFormContent() {
         nama: ocrData.nama || updatedPassengers[0].nama,
         nomorIdentitas: ocrData.nomorIdentitas || updatedPassengers[0].nomorIdentitas,
         tipeIdentitas: ocrData.tipeIdentitas || updatedPassengers[0].tipeIdentitas,
+        gender: ocrData.gender || updatedPassengers[0].gender,
       };
       setPassengersData(updatedPassengers);
     }
-    
-    // Show success message
-    alert('Data pemesan berhasil diekstrak!');
   };
 
   // Seat selection functions
@@ -594,7 +595,7 @@ function OrderFormContent() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="tuan">Tuan</SelectItem>
-                        <SelectItem value="nyonya">Nyonya</SelectItem>
+                        <SelectItem value="nona">Nona</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -750,7 +751,7 @@ function OrderFormContent() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="tuan">Tuan</SelectItem>
-                          <SelectItem value="nyonya">Nyonya</SelectItem>
+                          <SelectItem value="nona">Nona</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
