@@ -30,15 +30,6 @@ interface PassengerData {
   tipeIdentitas: string;
   nomorIdentitas: string;
   ageCategory: 'adult' | 'child';
-  selectedSeat?: SeatData;
-}
-
-interface SeatData {
-  wagon: string;
-  row: number;
-  column: string;
-  seatNumber: string;
-  isOccupied: boolean;
 }
 
 interface TicketData {
@@ -82,9 +73,6 @@ function OrderFormContent() {
 
   const [passengersData, setPassengersData] = useState<PassengerData[]>([]);
   const [useBookingDataForPassenger, setUseBookingDataForPassenger] = useState(false);
-  const [showSeatModal, setShowSeatModal] = useState(false);
-  const [currentPassengerIndex, setCurrentPassengerIndex] = useState<number>(-1);
-  const [occupiedSeats, setOccupiedSeats] = useState<string[]>([]);
 
   // Load ticket data from URL params or localStorage
   useEffect(() => {
@@ -310,75 +298,7 @@ function OrderFormContent() {
     alert('Data pemesan berhasil diekstrak!');
   };
 
-  // Seat selection functions
-  const isPassengerDataComplete = (passenger: PassengerData): boolean => {
-    return !!(passenger.nama.trim() && passenger.gender && passenger.tipeIdentitas && passenger.nomorIdentitas.trim());
-  };
-
-  const handleSeatSelection = (passengerIndex: number) => {
-    if (!isPassengerDataComplete(passengersData[passengerIndex])) {
-      alert('Mohon lengkapi data penumpang terlebih dahulu sebelum memilih kursi');
-      return;
-    }
-    setCurrentPassengerIndex(passengerIndex);
-    setShowSeatModal(true);
-  };
-
-  const generateSeatMap = () => {
-    // Different configurations based on train class
-    const classConfig = {
-      'eksekutif': { rows: 15, seatsPerRow: 4, wagon: 'EKS-A', spacing: 'luxury' },
-      'bisnis': { rows: 18, seatsPerRow: 4, wagon: 'BIS-A', spacing: 'comfort' },
-      'ekonomi': { rows: 20, seatsPerRow: 4, wagon: 'EKO-A', spacing: 'standard' }
-    };
-    
-    const config = classConfig[ticketData?.class?.toLowerCase() as keyof typeof classConfig] || classConfig.ekonomi;
-    const columns = ['A', 'B', 'C', 'D'];
-    const seats: SeatData[][] = [];
-
-    // Generate some random occupied seats for demo (different for each class)
-    const randomOccupiedSeats = ticketData?.class?.toLowerCase() === 'eksekutif' 
-      ? ['1A', '2B', '4C', '6D', '8A', '10B'] 
-      : ticketData?.class?.toLowerCase() === 'bisnis'
-      ? ['1A', '1B', '3C', '5D', '7A', '9B', '12C', '15D']
-      : ['1A', '1B', '3C', '5D', '7A', '9B', '12C', '15D', '18A', '19B'];
-
-    for (let row = 1; row <= config.rows; row++) {
-      const rowSeats: SeatData[] = [];
-      for (let col = 0; col < config.seatsPerRow; col++) {
-        const column = columns[col];
-        const seatNumber = `${row}${column}`;
-        const isOccupied = randomOccupiedSeats.includes(seatNumber) || 
-                          occupiedSeats.includes(seatNumber) ||
-                          passengersData.some(p => p.selectedSeat?.seatNumber === seatNumber);
-        
-        rowSeats.push({
-          wagon: config.wagon,
-          row,
-          column,
-          seatNumber,
-          isOccupied
-        });
-      }
-      seats.push(rowSeats);
-    }
-    return seats;
-  };
-
-  const handleSeatSelect = (seat: SeatData) => {
-    if (seat.isOccupied || currentPassengerIndex === -1) return;
-
-    const updatedPassengers = [...passengersData];
-    updatedPassengers[currentPassengerIndex] = {
-      ...updatedPassengers[currentPassengerIndex],
-      selectedSeat: seat
-    };
-    setPassengersData(updatedPassengers);
-    setShowSeatModal(false);
-    setCurrentPassengerIndex(-1);
-  };
-
-  const handleProceedToPayment = () => {
+  const handleProceedToSummary = () => {
     // Validate ticket data exists
     if (!ticketData) {
       alert("Data tiket tidak ditemukan. Silakan pilih tiket kembali.");
@@ -448,13 +368,9 @@ function OrderFormContent() {
         alert(`NIK penumpang ${i + 1} harus terdiri dari 16 digit`);
         return;
       }
-      if (!passenger.selectedSeat) {
-        alert(`Mohon pilih kursi untuk penumpang ${i + 1}`);
-        return;
-      }
     }
 
-    // Prepare data untuk payment
+    // Prepare data untuk summary
     const orderData = {
       ticketData,
       bookingData,
@@ -463,13 +379,13 @@ function OrderFormContent() {
     };
 
     try {
-      // Store order data in localStorage for payment page
+      // Store order data in localStorage for summary page
       localStorage.setItem('orderData', JSON.stringify(orderData));
       
       console.log("Order Data:", orderData);
       
-      // Navigate to payment page
-      router.push('/orders/payment');
+      // Navigate to summary page
+      router.push('/summary');
     } catch (error) {
       console.error('Error saving order data:', error);
       alert('Terjadi kesalahan saat menyimpan data. Silakan coba lagi.');
@@ -811,46 +727,6 @@ function OrderFormContent() {
                       )}
                     </div>
                   </div>
-
-                  {/* Seat Selection Section */}
-                  <div className="border-t border-gray-100 pt-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-semibold text-gray-800">Pilihan Kursi</h4>
-                        <p className="text-xs text-gray-500">
-                          {passenger.selectedSeat 
-                            ? `Kursi: ${passenger.selectedSeat.seatNumber} (${passenger.selectedSeat.wagon})`
-                            : 'Belum memilih kursi'
-                          }
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        {passenger.selectedSeat && (
-                          <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-lg text-sm">
-                            <CheckCircle className="w-4 h-4" />
-                            <span>{passenger.selectedSeat.seatNumber}</span>
-                          </div>
-                        )}
-                        <Button
-                          onClick={() => handleSeatSelection(index)}
-                          disabled={!isPassengerDataComplete(passenger)}
-                          variant="outline"
-                          className={`text-sm ${
-                            isPassengerDataComplete(passenger)
-                              ? 'border-blue-500 text-blue-600 hover:bg-blue-50'
-                              : 'border-gray-300 text-gray-400 cursor-not-allowed'
-                          }`}
-                        >
-                          {passenger.selectedSeat ? 'Ganti Kursi' : 'Pilih Kursi'}
-                        </Button>
-                      </div>
-                    </div>
-                    {!isPassengerDataComplete(passenger) && (
-                      <p className="text-xs text-amber-600 mt-2 bg-amber-50 p-2 rounded">
-                        Lengkapi data penumpang terlebih dahulu untuk memilih kursi
-                      </p>
-                    )}
-                  </div>
                 </div>
               </div>
             ))}
@@ -994,27 +870,6 @@ function OrderFormContent() {
                       </div>
                     )}
                   </div>
-                  
-                  {/* Selected Seats */}
-                  {passengersData.some(p => p.selectedSeat) && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <h5 className="font-medium text-xs text-gray-700 mb-2">Kursi Dipilih:</h5>
-                      <div className="space-y-1">
-                        {passengersData.map((passenger, index) => (
-                          passenger.selectedSeat && (
-                            <div key={index} className="flex justify-between items-center text-xs">
-                              <span className="text-gray-600">
-                                {passenger.nama || `Penumpang ${index + 1}`}
-                              </span>
-                              <span className="font-medium text-blue-600">
-                                {passenger.selectedSeat.seatNumber}
-                              </span>
-                            </div>
-                          )
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Price */}
@@ -1040,11 +895,11 @@ function OrderFormContent() {
                   </div>
 
                   <Button 
-                    onClick={handleProceedToPayment}
+                    onClick={handleProceedToSummary}
                     className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2.5 text-sm rounded-lg shadow-lg hover:shadow-xl transition-all duration-300"
                   >
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Lanjut ke Pembayaran
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Lanjutkan ke Ringkasan
                   </Button>
                   
                   <div className="text-xs text-gray-500 text-center mt-2">
@@ -1056,144 +911,6 @@ function OrderFormContent() {
           </div>
         </div>
       </div>
-
-      {/* Seat Selection Modal */}
-      {showSeatModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-xl font-bold">Pilih Kursi Penumpang</h3>
-                  <p className="text-blue-100 text-sm">
-                    {currentPassengerIndex >= 0 && passengersData[currentPassengerIndex]?.nama 
-                      ? `Untuk: ${passengersData[currentPassengerIndex].nama}` 
-                      : `Penumpang ${currentPassengerIndex + 1}`}
-                  </p>
-                </div>
-                <button 
-                  onClick={() => {setShowSeatModal(false); setCurrentPassengerIndex(-1);}}
-                  className="text-white hover:text-gray-300 text-2xl font-bold"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-            
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              {/* Train Info */}
-              <div className="mb-6 bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-semibold text-gray-800">{ticketData?.trainName}</h4>
-                    <p className="text-sm text-gray-600">
-                      Gerbong: {(() => {
-                        const classConfig = {
-                          'eksekutif': 'EKS-A',
-                          'bisnis': 'BIS-A', 
-                          'ekonomi': 'EKO-A'
-                        };
-                        return classConfig[ticketData?.class?.toLowerCase() as keyof typeof classConfig] || 'EKO-A';
-                      })()}
-                    </p>
-                  </div>
-                  <Badge className={getClassBadgeColor(ticketData?.class || '')}>
-                    {ticketData?.class}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Legend */}
-              <div className="mb-6">
-                <h4 className="font-semibold text-gray-800 mb-3">Keterangan:</h4>
-                <div className="flex flex-wrap gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-green-500 rounded border"></div>
-                    <span>Tersedia</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-red-500 rounded border"></div>
-                    <span>Terisi</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-blue-500 rounded border"></div>
-                    <span>Dipilih Penumpang Lain</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Seat Map */}
-              <div className="bg-gray-50 rounded-lg p-6">
-                <div className="text-center mb-4">
-                  <div className="inline-block bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-semibold">
-                    DEPAN KERETA
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  {generateSeatMap().map((row, rowIndex) => (
-                    <div key={rowIndex} className="flex items-center justify-center gap-2">
-                      {/* Row number */}
-                      <div className="w-8 text-center text-sm font-semibold text-gray-600">
-                        {rowIndex + 1}
-                      </div>
-                      
-                      {/* Left side seats (A, B) */}
-                      <div className="flex gap-1">
-                        {row.slice(0, 2).map((seat, seatIndex) => (
-                          <button
-                            key={`${seat.row}${seat.column}`}
-                            onClick={() => handleSeatSelect(seat)}
-                            disabled={seat.isOccupied}
-                            className={`w-8 h-8 rounded border-2 text-xs font-semibold transition-all ${
-                              seat.isOccupied
-                                ? 'bg-red-500 border-red-600 text-white cursor-not-allowed'
-                                : passengersData.some(p => p.selectedSeat?.seatNumber === seat.seatNumber)
-                                ? 'bg-blue-500 border-blue-600 text-white'
-                                : 'bg-green-500 border-green-600 text-white hover:bg-green-600 cursor-pointer'
-                            }`}
-                          >
-                            {seat.column}
-                          </button>
-                        ))}
-                      </div>
-                      
-                      {/* Aisle space */}
-                      <div className="w-6"></div>
-                      
-                      {/* Right side seats (C, D) */}
-                      <div className="flex gap-1">
-                        {row.slice(2, 4).map((seat, seatIndex) => (
-                          <button
-                            key={`${seat.row}${seat.column}`}
-                            onClick={() => handleSeatSelect(seat)}
-                            disabled={seat.isOccupied}
-                            className={`w-8 h-8 rounded border-2 text-xs font-semibold transition-all ${
-                              seat.isOccupied
-                                ? 'bg-red-500 border-red-600 text-white cursor-not-allowed'
-                                : passengersData.some(p => p.selectedSeat?.seatNumber === seat.seatNumber)
-                                ? 'bg-blue-500 border-blue-600 text-white'
-                                : 'bg-green-500 border-green-600 text-white hover:bg-green-600 cursor-pointer'
-                            }`}
-                          >
-                            {seat.column}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="text-center mt-4">
-                  <div className="inline-block bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-semibold">
-                    BELAKANG KERETA
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
