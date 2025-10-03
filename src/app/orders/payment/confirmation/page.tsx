@@ -150,7 +150,7 @@ const convertToTicketFormat = (orderData: OrderData, bookingCode: string) => {
     arrivalDate: formatDateTime(ticketData.departureDate, ticketData.arrivalTime),
     seatClass: `${ticketData.class} (${ticketData.class.substring(0, 3).toUpperCase()})`,
     seatNumber: getSeatInfo(ticketData.class),
-    qrCodeValue: `https://booking.kai.id/booking-code/${bookingCode}`
+    qrCodeValue: `http://localhost:3000/booking-code/${bookingCode}`
   };
 };
 
