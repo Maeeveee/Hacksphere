@@ -124,6 +124,59 @@ function SummaryContent() {
     fetchOccupiedSeats();
   }, [orderData]);
 
+  // Auto-assign seats when occupied seats are loaded and passengers don't have seats yet
+  useEffect(() => {
+    if (!orderData || isLoadingSeats || occupiedSeats.length === 0) return;
+    
+    // Check if any passenger doesn't have a seat yet
+    const hasUnassignedSeats = orderData.passengersData.some(p => !p.selectedSeat);
+    if (!hasUnassignedSeats) return; // All passengers already have seats
+    
+    console.log('🎯 Auto-assigning seats for passengers...');
+    
+    const seatMap = generateSeatMap();
+    const availableSeats: SeatData[] = [];
+    
+    // Collect all available seats
+    seatMap.forEach(row => {
+      row.forEach(seat => {
+        if (!seat.isOccupied) {
+          availableSeats.push(seat);
+        }
+      });
+    });
+
+    // Check if we have enough available seats
+    if (availableSeats.length < orderData.passengersData.length) {
+      console.warn(`⚠️ Not enough seats available. Only ${availableSeats.length} seats for ${orderData.passengersData.length} passengers.`);
+      return;
+    }
+
+    // Assign seats to passengers who don't have one
+    const updatedPassengers = [...orderData.passengersData];
+    let seatIndex = 0;
+    
+    for (let i = 0; i < updatedPassengers.length; i++) {
+      if (!updatedPassengers[i].selectedSeat) {
+        updatedPassengers[i] = {
+          ...updatedPassengers[i],
+          selectedSeat: availableSeats[seatIndex]
+        };
+        seatIndex++;
+      }
+    }
+    
+    const updatedOrderData = {
+      ...orderData,
+      passengersData: updatedPassengers
+    };
+    
+    setOrderData(updatedOrderData);
+    localStorage.setItem('orderData', JSON.stringify(updatedOrderData));
+    
+    console.log('✅ Auto-assigned seats successfully!');
+  }, [occupiedSeats, isLoadingSeats, orderData]);
+
   // Seat selection functions
   const handleSeatSelection = (passengerIndex: number) => {
     setCurrentPassengerIndex(passengerIndex);
@@ -414,7 +467,7 @@ function SummaryContent() {
                   </div>
                   <div>
                     <div className="text-xl font-bold text-gray-800">Data Penumpang & Kursi</div>
-                    <div className="text-sm text-gray-600">Daftar penumpang dan pilihan kursi</div>
+                    <div className="text-sm text-gray-600">Daftar penumpang dan pilihan kursi (dipilih otomatis)</div>
                   </div>
                 </div>
               </div>
