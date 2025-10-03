@@ -7,6 +7,7 @@ import TicketDisplay from '@/components/TicketDisplay';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { saveTiket, updatePaymentStatus, type Tiket } from '@/lib/supabase/queries';
+import { CheckCircle2 } from 'lucide-react';
 
 interface BookingFormData {
   gender: string;
@@ -149,7 +150,7 @@ const convertToTicketFormat = (orderData: OrderData, bookingCode: string) => {
     arrivalDate: formatDateTime(ticketData.departureDate, ticketData.arrivalTime),
     seatClass: `${ticketData.class} (${ticketData.class.substring(0, 3).toUpperCase()})`,
     seatNumber: getSeatInfo(ticketData.class),
-    qrCodeValue: `https://booking.kai.id/booking-code/${bookingCode}`
+    qrCodeValue: `http://localhost:3000/booking-code/${bookingCode}`
   };
 };
 
@@ -161,6 +162,7 @@ function PaymentConfirmationContent() {
     const [isLoading, setIsLoading] = useState(true);
     const [bookingCode] = useState(() => generateBookingCode());
     const [paymentCode] = useState(() => generatePaymentCode());
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     // Default payment deadline (1 hour 5 minutes)
     const paymentDeadlineInSeconds = 1 * 3600 + 5 * 60; 
@@ -382,8 +384,8 @@ function PaymentConfirmationContent() {
             localStorage.setItem('bookingHistory', JSON.stringify(bookingHistory));
         }
 
-        // Show success notification
-        alert('Pembayaran berhasil! Tiket Anda telah dikonfirmasi.');
+        // Show success modal instead of default alert
+        setShowSuccessModal(true);
     };
 
     const handleBackClick = () => {
@@ -449,6 +451,41 @@ function PaymentConfirmationContent() {
                             deadlineSeconds={paymentData.paymentDeadline || paymentDeadlineInSeconds}
                             onPaymentComplete={handlePaymentComplete}
                         />
+                    </div>
+                )}
+                {showSuccessModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowSuccessModal(false)} />
+                        <div className="relative z-10 w-full max-w-md origin-center animate-scale-in">
+                            <div className="bg-white rounded-2xl shadow-xl border border-blue-100 overflow-hidden">
+                                <div className="p-6 text-center">
+                                    <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-green-50 flex items-center justify-center">
+                                        <CheckCircle2 className="h-10 w-10 text-green-500" />
+                                    </div>
+                                    <h2 className="text-xl font-semibold text-gray-800 mb-2">Pembayaran Berhasil</h2>
+                                    <p className="text-gray-600 mb-4">Tiket Anda telah dikonfirmasi dan siap ditampilkan.</p>
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => { setShowSuccessModal(false); setIsPaid(true); }}>
+                                            Lihat Tiket
+                                        </Button>
+                                        <Button variant="outline" className="flex-1" onClick={() => router.push('/')}>Kembali ke Beranda</Button>
+                                    </div>
+                                </div>
+                                {paymentData && (
+                                    <div className="bg-gray-50 px-6 py-4 text-sm text-left grid gap-1">
+                                        <div className="flex justify-between"><span className="text-gray-500">Kode Booking</span><span className="font-medium">{paymentData.bookingCode || bookingCode}</span></div>
+                                        <div className="flex justify-between"><span className="text-gray-500">Kereta</span><span className="font-medium truncate max-w-[170px] text-right">{paymentData.orderData.ticketData.trainName}</span></div>
+                                        <div className="flex justify-between"><span className="text-gray-500">Rute</span><span className="font-medium">{paymentData.orderData.ticketData.origin} → {paymentData.orderData.ticketData.destination}</span></div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <style jsx>{`
+                            .animate-fade-in { animation: fadeIn .25s ease; }
+                            .animate-scale-in { animation: scaleIn .25s ease; }
+                            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                            @keyframes scaleIn { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
+                        `}</style>
                     </div>
                 )}
             </div>
