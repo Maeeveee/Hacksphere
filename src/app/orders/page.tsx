@@ -14,6 +14,7 @@ import { ArrowLeft, Clock, MapPin, Train, Users, CreditCard, Wifi, Utensils, Zap
 import UserMenu from "@/components/UserMenu";
 import OCRScanner from "@/components/OCRScanner";
 import { randomizeAdjacentSeats, type SeatConfig } from "@/lib/seatUtils";
+import { getOccupiedSeats } from "@/lib/supabase/queries";
 
 interface BookingFormData {
   gender: string;
@@ -302,7 +303,7 @@ function OrderFormContent() {
     }
   };
 
-  const handleProceedToSummary = () => {
+  const handleProceedToSummary = async () => {
     // Validate ticket data exists
     if (!ticketData) {
       alert("Data tiket tidak ditemukan. Silakan pilih tiket kembali.");
@@ -383,11 +384,6 @@ function OrderFormContent() {
       return passenger;
     });
 
-    // Get occupied seats from passengers yang sudah pilih
-    const occupiedSeats = passengersData
-      .filter(p => p.selectedSeat && p.selectedSeat.seatNumber)
-      .map(p => p.selectedSeat!.seatNumber);
-
     // Count passengers yang belum punya seat
     const passengersNeedingSeats = passengersData.filter(
       p => !p.selectedSeat || !p.selectedSeat.seatNumber
@@ -396,10 +392,42 @@ function OrderFormContent() {
     if (passengersNeedingSeats.length > 0) {
       console.log(`🎲 Auto-assigning ${passengersNeedingSeats.length} seats...`);
       
-      // Generate random adjacent seats
+      // ✅ FETCH OCCUPIED SEATS FROM DATABASE
+      console.log('🔍 Fetching occupied seats from database...');
+      const { data: dbOccupiedSeats, error: dbError } = await getOccupiedSeats(
+        ticketData.trainName,
+        ticketData.class,
+        ticketData.departureDate,
+        ticketData.departureTime
+      );
+
+      if (dbError) {
+        console.error('❌ Error fetching occupied seats:', dbError);
+        alert('Gagal mengambil data kursi dari database. Silakan refresh halaman.');
+        return;
+      }
+
+      // Combine occupied seats from database + seats already selected in this session
+      const sessionOccupiedSeats = passengersData
+        .filter(p => p.selectedSeat && p.selectedSeat.seatNumber)
+        .map(p => p.selectedSeat!.seatNumber);
+
+      const allOccupiedSeats = [
+        ...(dbOccupiedSeats || []),
+        ...sessionOccupiedSeats
+      ];
+
+      // Remove duplicates
+      const uniqueOccupiedSeats = [...new Set(allOccupiedSeats)];
+
+      console.log('🪑 Occupied seats from database:', dbOccupiedSeats);
+      console.log('🪑 Occupied seats from session:', sessionOccupiedSeats);
+      console.log('🪑 Total unique occupied seats:', uniqueOccupiedSeats);
+      
+      // Generate random adjacent seats (EXCLUDING occupied seats from DB + session)
       const randomSeats = randomizeAdjacentSeats(
         ticketData.class,
-        occupiedSeats,
+        uniqueOccupiedSeats,
         passengersNeedingSeats.length
       );
 

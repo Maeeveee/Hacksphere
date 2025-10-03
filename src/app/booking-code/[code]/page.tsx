@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Train, MapPin, Clock, User, CreditCard, CheckCircle, Wifi, Utensils, Zap, Bed, Calendar } from "lucide-react";
-import UserMenu from "@/components/UserMenu";
 import { getTiketByBookingCode, type TiketQRData } from "@/lib/supabase/queries";
 
 interface TicketInfo {
@@ -47,27 +46,14 @@ export default function BookingCodePage() {
     // Get ticket data from database OR localStorage
     const fetchTicketData = async () => {
       try {
-        console.log('🔍 Fetching ticket data for booking code:', bookingCode);
-        
         // STEP 1: Coba ambil dari database dulu
         const { data: dbData, error: dbError } = await getTiketByBookingCode(bookingCode);
         
         if (dbData && !dbError) {
-          console.log('✅ Ticket found in DATABASE:', dbData);
-          console.log('📋 Seat info from DB:', {
-            passengers: dbData.passengers_data?.length,
-            seats: dbData.passengers_data?.map((p: any) => p.selectedSeat?.seatNumber)
-          });
           const ticketInfo = convertTiketToTicketInfo(dbData);
-          console.log('🎫 Converted ticket info:', ticketInfo);
           setTicketInfo(ticketInfo);
           setIsLoading(false);
           return;
-        } else {
-          console.log('ℹ️ Ticket not found in database, checking localStorage...');
-          if (dbError) {
-            console.log('Database error:', dbError);
-          }
         }
         
         // STEP 2: Kalau tidak ada di database, cek di localStorage (paymentData)
@@ -77,7 +63,6 @@ export default function BookingCodePage() {
           const paymentData = JSON.parse(storedPaymentData);
           
           if (paymentData.bookingCode === bookingCode) {
-            console.log('✅ Ticket found in LOCALSTORAGE (paymentData)');
             const ticketInfo = generateTicketInfoFromLocalStorage(paymentData);
             setTicketInfo(ticketInfo);
             setIsLoading(false);
@@ -92,7 +77,6 @@ export default function BookingCodePage() {
           const foundTicket = ticketHistory.find((t: any) => t.bookingCode === bookingCode);
           
           if (foundTicket) {
-            console.log('✅ Ticket found in LOCALSTORAGE (ticketHistory)');
             // Reconstruct payment data format
             const paymentData = {
               bookingCode: foundTicket.bookingCode,
@@ -109,7 +93,6 @@ export default function BookingCodePage() {
         }
         
         // STEP 4: Tidak ditemukan di mana pun
-        console.log('❌ Ticket not found anywhere');
         setError("Kode booking tidak ditemukan. Silakan lakukan pembayaran terlebih dahulu.");
         setIsLoading(false);
         
@@ -151,16 +134,6 @@ export default function BookingCodePage() {
         year: 'numeric' 
       });
       return `${dayName}, ${formattedDate} - ${time}`;
-    };
-
-    const getSeatInfo = (className: string): string => {
-      const seatNumbers: { [key: string]: string } = {
-        'Eksekutif': '2A-12',
-        'Bisnis': '3B-15',
-        'Ekonomi': '4C-20',
-        'Ekonomi Premium': '3D-18'
-      };
-      return seatNumbers[className] || 'N/A';
     };
     
     // Fungsi untuk mendapatkan seat number dari passengers_data
@@ -259,15 +232,19 @@ export default function BookingCodePage() {
       });
       return `${dayName}, ${formattedDate} - ${time}`;
     };
-
-    const getSeatInfo = (className: string): string => {
-      const seatNumbers: { [key: string]: string } = {
-        'Eksekutif': '2A-12',
-        'Bisnis': '3B-15',
-        'Ekonomi': '4C-20',
-        'Ekonomi Premium': '3D-18'
-      };
-      return seatNumbers[className] || 'N/A';
+    
+    // Fungsi untuk mendapatkan seat number dari passengers_data
+    const getActualSeatNumbers = (passengersData: any[]): string => {
+      if (!passengersData || passengersData.length === 0) {
+        return 'N/A';
+      }
+      
+      const seats = passengersData
+        .map((p: any) => p.selectedSeat?.seatNumber)
+        .filter((s: string) => s)
+        .join(', ');
+      
+      return seats || 'N/A';
     };
 
     const originCode = getStationCode(ticketData.origin);
@@ -283,7 +260,7 @@ export default function BookingCodePage() {
       departureDate: formatDateTime(ticketData.departureDate, ticketData.departureTime),
       arrivalDate: formatDateTime(ticketData.departureDate, ticketData.arrivalTime),
       seatClass: `${ticketData.class} (${ticketData.class.substring(0, 3).toUpperCase()})`,
-      seatNumber: getSeatInfo(ticketData.class),
+      seatNumber: getActualSeatNumbers(passengersData), // Ambil dari passengers data
       qrCodeValue: `http://localhost:3000/booking-code/${paymentData.bookingCode}`,
       ticketData,
       bookingData,
@@ -304,7 +281,6 @@ export default function BookingCodePage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50">
-        <UserMenu />
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-center">
@@ -320,7 +296,6 @@ export default function BookingCodePage() {
   if (error || !ticketInfo) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50">
-        <UserMenu />
         <div className="container mx-auto px-4 py-8">
           <Button
             onClick={() => router.push('/')}
@@ -349,230 +324,284 @@ export default function BookingCodePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50">
-      <UserMenu />
-      
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-6">
-          <Button
-            onClick={() => router.push('/')}
-            variant="outline"
-            className="mb-4 hover:bg-blue-50"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Kembali ke Beranda
-          </Button>
+    <>
+      <style jsx global>{`
+        /* Ensure header fills to top of card - remove all gaps */
+        .card-header-full {
+          margin-top: 0 !important;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+          margin-bottom: 0 !important;
+          padding-top: 1.5rem;
+          border-radius: 0.5rem 0.5rem 0 0 !important;
+        }
+        
+        /* Remove default padding from Card component */
+        .print-card {
+          padding: 0 !important;
+        }
+        
+        @media print {
+          /* Hide non-ticket elements */
+          .no-print {
+            display: none !important;
+          }
           
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Detail Tiket</h1>
-              <p className="text-gray-600">Kode Booking: <span className="font-bold text-blue-600">{bookingCode}</span></p>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {ticketInfo.paymentStatus === 'paid' ? (
-                <Badge className="bg-green-500 text-white px-4 py-2 text-sm">
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Lunas
-                </Badge>
-              ) : ticketInfo.paymentStatus === 'pending' ? (
-                <Badge className="bg-yellow-500 text-white px-4 py-2 text-sm">
-                  <Clock className="w-4 h-4 mr-2" />
-                  Menunggu Pembayaran
-                </Badge>
-              ) : (
-                <Badge className="bg-green-500 text-white px-4 py-2 text-sm">
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Tiket Valid
-                </Badge>
-              )}
+          /* Remove page margins */
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
+          
+          /* Ensure cards stack properly for print */
+          .print-card {
+            page-break-after: always;
+            page-break-inside: avoid;
+            margin-bottom: 0 !important;
+          }
+          
+          /* Last ticket should not force new page */
+          .print-card:last-child {
+            page-break-after: auto;
+          }
+          
+          /* Preserve colors in print */
+          * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+        }
+      `}</style>
+      
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50">
+        <div className="container mx-auto px-4 py-8">
+          {/* Header - Hide on print */}
+          <div className="mb-6 no-print">
+            <Button
+              onClick={() => router.push('/')}
+              variant="outline"
+              className="mb-4 hover:bg-blue-50"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Kembali ke Beranda
+            </Button>
+            
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Detail Tiket</h1>
+                <p className="text-gray-600">Kode Booking: <span className="font-bold text-blue-600">{bookingCode}</span></p>
+              </div>
+              <div className="flex gap-3 flex-wrap items-center">
+                {/* Badge Status */}
+                {ticketInfo.paymentStatus === 'terkonfirmasi' || ticketInfo.paymentStatus === 'paid' ? (
+                  <Badge className="bg-green-500 text-white px-4 py-2 text-sm">
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Lunas
+                  </Badge>
+                ) : ticketInfo.paymentStatus === 'menunggu_pembayaran' || ticketInfo.paymentStatus === 'pending' ? (
+                  <Badge className="bg-yellow-500 text-white px-4 py-2 text-sm">
+                    <Clock className="w-4 h-4 mr-2" />
+                    Menunggu Pembayaran
+                  </Badge>
+                ) : (
+                  <Badge className="bg-green-500 text-white px-4 py-2 text-sm">
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Tiket Valid
+                  </Badge>
+                )}
+                
+                {/* Tombol Cetak - Sejajar dengan Badge */}
+                <Button 
+                  onClick={() => window.print()} 
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Cetak Semua Tiket ({ticketInfo.passengersData?.length || 0})
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Ticket Card */}
-        <Card className="max-w-4xl mx-auto shadow-xl overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-3">
-                <Train className="w-8 h-8" />
-                <div>
-                  <CardTitle className="text-2xl">{ticketInfo.trainName}</CardTitle>
-                  <p className="text-blue-100 text-sm">Nomor: {ticketInfo.trainNumber}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-blue-100">Kelas</p>
-                <p className="text-xl font-bold">{ticketInfo.seatClass}</p>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-6 md:p-8">
-            {/* Journey Info */}
-            <div className="mb-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Departure */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <MapPin className="w-5 h-5" />
-                    <span className="font-semibold">Keberangkatan</span>
-                  </div>
-                  <div className="ml-7">
-                    <p className="text-xl font-bold text-gray-900">{ticketInfo.origin}</p>
-                    <div className="flex items-center gap-2 text-gray-600 mt-1">
-                      <Clock className="w-4 h-4" />
-                      <p className="text-sm">{ticketInfo.departureDate}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Arrival */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <MapPin className="w-5 h-5" />
-                    <span className="font-semibold">Tujuan</span>
-                  </div>
-                  <div className="ml-7">
-                    <p className="text-xl font-bold text-gray-900">{ticketInfo.destination}</p>
-                    <div className="flex items-center gap-2 text-gray-600 mt-1">
-                      <Clock className="w-4 h-4" />
-                      <p className="text-sm">{ticketInfo.arrivalDate}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-200 pt-6 mb-6"></div>
-
-            {/* Passenger & Seat Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <User className="w-5 h-5" />
-                  <span className="font-semibold">Nama Penumpang</span>
-                </div>
-                <p className="ml-7 text-lg font-medium text-gray-900">{ticketInfo.passengerName}</p>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <CreditCard className="w-5 h-5" />
-                  <span className="font-semibold">Nomor Kursi</span>
-                </div>
-                <p className="ml-7 text-lg font-medium text-gray-900">{ticketInfo.seatNumber}</p>
-              </div>
-            </div>
-
-            {/* Facilities */}
-            {ticketInfo.ticketData?.facilities && ticketInfo.ticketData.facilities.length > 0 && (
-              <>
-                <div className="border-t border-gray-200 pt-6 mb-6"></div>
-                <div className="space-y-3">
-                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                    Fasilitas
-                  </h3>
-                  <div className="flex flex-wrap gap-2 ml-7">
-                    {ticketInfo.ticketData.facilities.map((facility: string, index: number) => (
-                      <Badge key={index} variant="outline" className="px-3 py-1.5">
-                        <span className="mr-1.5">{getFacilityIcon(facility)}</span>
-                        {facility}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Passengers List */}
-            {ticketInfo.passengersData && ticketInfo.passengersData.length > 0 && (
-              <>
-                <div className="border-t border-gray-200 pt-6 mb-6 mt-6"></div>
-                <div className="space-y-3">
-                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <User className="w-5 h-5 text-blue-600" />
-                    Daftar Penumpang ({ticketInfo.passengersData.length})
-                  </h3>
-                  <div className="ml-7 space-y-2">
-                    {ticketInfo.passengersData.map((passenger: any, index: number) => (
-                      <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+          {/* Tickets Section */}
+          <div id="printable-ticket">
+            {/* Loop untuk setiap penumpang - 1 tiket per penumpang */}
+            {ticketInfo.passengersData && ticketInfo.passengersData.length > 0 ? (
+              ticketInfo.passengersData.map((passenger: any, passengerIndex: number) => (
+                <Card key={passengerIndex} className="max-w-4xl mx-auto shadow-xl overflow-hidden mb-8 print-card p-0">
+                  <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white card-header-full">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
+                      <div className="flex items-center gap-3">
+                        <Train className="w-8 h-8" />
                         <div>
-                          <p className="font-medium text-gray-900">{passenger.nama}</p>
-                          <p className="text-sm text-gray-600">
-                            {passenger.tipeIdentitas}: {passenger.nomorIdentitas}
-                          </p>
+                          <CardTitle className="text-2xl">{ticketInfo.trainName}</CardTitle>
+                          <p className="text-blue-100 text-sm">Nomor: {ticketInfo.trainNumber}</p>
                         </div>
-                        <Badge variant="outline" className="capitalize">
-                          {passenger.ageCategory === 'adult' ? 'Dewasa' : 'Anak'}
-                        </Badge>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Booking Info */}
-            <div className="border-t border-gray-200 pt-6 mt-6">
-              <div className="bg-blue-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Informasi Booking</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-gray-600">Kode Booking</p>
-                    <p className="font-bold text-blue-600 text-lg">{ticketInfo.bookingCode}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600">Total Pembayaran</p>
-                    <p className="font-bold text-gray-900">
-                      Rp {(ticketInfo.totalPrice || (ticketInfo.ticketData?.price * (ticketInfo.ticketData?.passengers || 1)) || 0).toLocaleString('id-ID')}
-                    </p>
-                  </div>
-                  {ticketInfo.paymentStatus && (
-                    <div>
-                      <p className="text-gray-600">Status Pembayaran</p>
-                      <p className="font-bold capitalize">
-                        {ticketInfo.paymentStatus === 'paid' ? 'Lunas' : ticketInfo.paymentStatus === 'pending' ? 'Menunggu Pembayaran' : ticketInfo.paymentStatus}
-                      </p>
+                      <div className="text-right">
+                        <p className="text-sm text-blue-100">Kelas</p>
+                        <p className="text-xl font-bold">{ticketInfo.seatClass}</p>
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
+                  </CardHeader>
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 mt-8">
-              <Button 
-                onClick={() => window.print()} 
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
-              >
-                <CreditCard className="mr-2 h-4 w-4" />
-                Cetak Tiket
-              </Button>
-              <Button 
-                onClick={() => router.push('/')} 
-                variant="outline"
-                className="flex-1"
-              >
-                Kembali ke Beranda
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+                  <CardContent className="p-6 md:p-8">
+                    {/* Journey Info */}
+                    <div className="mb-8">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Departure */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <MapPin className="w-5 h-5" />
+                            <span className="font-semibold">Keberangkatan</span>
+                          </div>
+                          <div className="ml-7">
+                            <p className="text-xl font-bold text-gray-900">{ticketInfo.origin}</p>
+                            <div className="flex items-center gap-2 text-gray-600 mt-1">
+                              <Clock className="w-4 h-4" />
+                              <p className="text-sm">{ticketInfo.departureDate}</p>
+                            </div>
+                          </div>
+                        </div>
 
-        {/* Additional Info */}
-        <div className="max-w-4xl mx-auto mt-6">
-          <Card className="bg-yellow-50 border-yellow-200">
-            <CardContent className="p-4">
-              <p className="text-sm text-gray-700">
-                <span className="font-semibold">Catatan:</span> Harap tunjukkan tiket ini dan identitas diri yang sesuai saat check-in di stasiun.
-                Datang minimal 30 menit sebelum keberangkatan.
-              </p>
-            </CardContent>
-          </Card>
+                        {/* Arrival */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <MapPin className="w-5 h-5" />
+                            <span className="font-semibold">Tujuan</span>
+                          </div>
+                          <div className="ml-7">
+                            <p className="text-xl font-bold text-gray-900">{ticketInfo.destination}</p>
+                            <div className="flex items-center gap-2 text-gray-600 mt-1">
+                              <Clock className="w-4 h-4" />
+                              <p className="text-sm">{ticketInfo.arrivalDate}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-200 pt-6 mb-6"></div>
+
+                    {/* Passenger Info - Individual */}
+                    <div className="space-y-4 mb-8">
+                      <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-lg">
+                        <User className="w-6 h-6 text-blue-600" />
+                        Informasi Penumpang
+                      </h3>
+                      <div className="ml-8 bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                          <div>
+                            <p className="text-sm text-gray-600">Nama Lengkap</p>
+                            <p className="text-lg font-bold text-gray-900">{passenger.nama}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Nomor Kursi</p>
+                            <p className="text-3xl font-bold text-blue-600">
+                              {passenger.selectedSeat?.seatNumber || 'N/A'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Nomor Identitas</p>
+                            <p className="text-base font-medium text-gray-900">
+                              {passenger.tipeIdentitas}: {passenger.nomorIdentitas}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Kategori</p>
+                            <div className="flex gap-2 mt-1">
+                              <Badge variant="outline" className="capitalize">
+                                {passenger.ageCategory === 'adult' ? 'Dewasa' : 'Anak'}
+                              </Badge>
+                              {passenger.disabilitas && (
+                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                  Disabilitas
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Facilities */}
+                    {ticketInfo.ticketData?.facilities && ticketInfo.ticketData.facilities.length > 0 && (
+                      <>
+                        <div className="border-t border-gray-200 pt-6 mb-6"></div>
+                        <div className="space-y-3">
+                          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 text-green-600" />
+                            Fasilitas
+                          </h3>
+                          <div className="flex flex-wrap gap-2 ml-7">
+                            {ticketInfo.ticketData.facilities.map((facility: string, index: number) => (
+                              <Badge key={index} variant="outline" className="px-3 py-1.5">
+                                <span className="mr-1.5">{getFacilityIcon(facility)}</span>
+                                {facility}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Booking Info */}
+                    <div className="border-t border-gray-200 pt-6 mt-6">
+                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <h3 className="font-semibold text-gray-900 mb-3">Informasi Booking</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                          <div>
+                            <p className="text-gray-600">Kode Booking</p>
+                            <p className="font-bold text-blue-600 text-lg">{ticketInfo.bookingCode}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Tiket</p>
+                            <p className="font-bold text-gray-900">
+                              {passengerIndex + 1} dari {ticketInfo.passengersData?.length || 0}
+                            </p>
+                          </div>
+                          {ticketInfo.paymentStatus && (
+                            <div>
+                              <p className="text-gray-600">Status</p>
+                              <p className="font-bold capitalize text-green-600">
+                                {ticketInfo.paymentStatus === 'terkonfirmasi' || ticketInfo.paymentStatus === 'paid' ? 'Lunas' : ticketInfo.paymentStatus === 'menunggu_pembayaran' || ticketInfo.paymentStatus === 'pending' ? 'Menunggu' : ticketInfo.paymentStatus}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              // Fallback jika tidak ada data penumpang
+              <Card className="max-w-4xl mx-auto shadow-xl overflow-hidden print-card p-0">
+                <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white card-header-full">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex items-center gap-3">
+                      <Train className="w-8 h-8" />
+                      <div>
+                        <CardTitle className="text-2xl">{ticketInfo.trainName}</CardTitle>
+                        <p className="text-blue-100 text-sm">Nomor: {ticketInfo.trainNumber}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-blue-100">Kelas</p>
+                      <p className="text-xl font-bold">{ticketInfo.seatClass}</p>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-6 md:p-8">
+                  <div className="text-center py-12">
+                    <p className="text-gray-600">Data penumpang tidak tersedia</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

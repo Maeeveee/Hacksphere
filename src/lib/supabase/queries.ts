@@ -392,9 +392,21 @@ export async function saveTiket(tiketData: Omit<Tiket, 'id' | 'dibuat_pada'>): P
 export async function getTiketByBookingCode(bookingCode: string): Promise<{ data: TiketQRData | null; error: any }> {
   const supabase = createClient();
   
+  // Query tiket dengan join ke kursi untuk mendapatkan seat number
   const { data, error } = await supabase
     .from('tiket')
-    .select('*')
+    .select(`
+      *,
+      kursi:id_kursi (
+        baris_kursi,
+        huruf_kursi
+      ),
+      penumpang:id_penumpang (
+        nama_lengkap,
+        nomor_identitas,
+        apakah_penumpang_disabilitas
+      )
+    `)
     .eq('data_qr_code->booking_code', bookingCode)
     .single();
 
@@ -408,6 +420,29 @@ export async function getTiketByBookingCode(bookingCode: string): Promise<{ data
     const qrData = typeof data.data_qr_code === 'string' 
       ? JSON.parse(data.data_qr_code) 
       : data.data_qr_code;
+    
+    // Tambahkan seat number dari database jika ada
+    if (data.kursi && data.kursi.baris_kursi && data.kursi.huruf_kursi) {
+      const dbSeatNumber = `${data.kursi.baris_kursi}${data.kursi.huruf_kursi}`;
+      
+      // Update seat number di passengers_data jika ada
+      if (qrData.passengers_data && Array.isArray(qrData.passengers_data)) {
+        qrData.passengers_data = qrData.passengers_data.map((passenger: any, index: number) => {
+          // Jika ini tiket pertama dan ada seat dari DB, gunakan itu
+          if (index === 0 && !passenger.selectedSeat?.seatNumber) {
+            return {
+              ...passenger,
+              selectedSeat: {
+                ...passenger.selectedSeat,
+                seatNumber: dbSeatNumber
+              }
+            };
+          }
+          return passenger;
+        });
+      }
+    }
+    
     return { data: qrData as TiketQRData, error: null };
   } catch (parseError) {
     console.error('Error parsing QR data:', parseError);
@@ -539,22 +574,24 @@ export async function getOccupiedSeats(
   const supabase = createClient();
   
   try {
-    // Query tiket berdasarkan data di data_qr_code JSON
-    // Filter berdasarkan train_name, train_class, departure_date, departure_time
-    // Dan payment_status = 'menunggu_pembayaran' atau 'terkonfirmasi'
+    console.log('🔍 Fetching occupied seats for:', { trainName, trainClass, departureDate, departureTime });
     
+    // Query SEMUA tiket tanpa filter payment_status terlebih dahulu
+    // Karena kita akan filter manual di JavaScript untuk lebih fleksibel
     const { data, error } = await supabase
       .from('tiket')
-      .select('data_qr_code')
-      .or(`data_qr_code->>payment_status.eq.menunggu_pembayaran,data_qr_code->>payment_status.eq.terkonfirmasi`);
+      .select('data_qr_code, id');
 
     if (error) {
-      console.error('Error getting occupied seats:', error);
+      console.error('❌ Error getting occupied seats:', error);
       return { data: null, error };
     }
 
+    console.log('📊 Total tickets in database:', data?.length || 0);
+
     // Extract seat numbers from data_qr_code JSON
     const occupiedSeats: string[] = [];
+    const debugInfo: any[] = [];
     
     if (data && data.length > 0) {
       data.forEach((tiket) => {
@@ -563,33 +600,54 @@ export async function getOccupiedSeats(
             ? JSON.parse(tiket.data_qr_code) 
             : tiket.data_qr_code;
           
+          // Debug: log payment status
+          debugInfo.push({
+            id: tiket.id,
+            booking_code: qrData.booking_code,
+            payment_status: qrData.payment_status,
+            train_name: qrData.train_name,
+            train_class: qrData.train_class,
+            departure_date: qrData.departure_date,
+            departure_time: qrData.departure_time
+          });
+          
           // Filter by train, class, date, time
-          if (
-            qrData.train_name === trainName &&
-            qrData.train_class === trainClass &&
-            qrData.departure_date === departureDate &&
-            qrData.departure_time === departureTime
-          ) {
+          const isMatchingTrain = qrData.train_name === trainName;
+          const isMatchingClass = qrData.train_class === trainClass;
+          const isMatchingDate = qrData.departure_date === departureDate;
+          const isMatchingTime = qrData.departure_time === departureTime;
+          
+          // Accept multiple payment status variants:
+          // - menunggu_pembayaran, pending (waiting for payment)
+          // - terkonfirmasi, paid (confirmed/paid)
+          const validStatuses = ['menunggu_pembayaran', 'pending', 'terkonfirmasi', 'paid', 'confirmed'];
+          const isValidStatus = validStatuses.includes(qrData.payment_status?.toLowerCase());
+          
+          if (isMatchingTrain && isMatchingClass && isMatchingDate && isMatchingTime && isValidStatus) {
             // Extract seat numbers from passengers_data
             const passengersData = qrData.passengers_data;
             if (Array.isArray(passengersData)) {
               passengersData.forEach((passenger: any) => {
                 if (passenger.selectedSeat && passenger.selectedSeat.seatNumber) {
                   occupiedSeats.push(passenger.selectedSeat.seatNumber);
+                  console.log('✅ Found occupied seat:', passenger.selectedSeat.seatNumber, 'for', passenger.nama);
                 }
               });
             }
           }
         } catch (parseError) {
-          console.error('Error parsing QR data:', parseError);
+          console.error('❌ Error parsing QR data:', parseError);
         }
       });
     }
 
-    console.log('Occupied seats from database:', occupiedSeats);
+    console.log('📋 All tickets debug info:', debugInfo);
+    console.log('🪑 Total occupied seats found:', occupiedSeats.length);
+    console.log('🪑 Occupied seats list:', occupiedSeats);
+    
     return { data: occupiedSeats, error: null };
   } catch (err) {
-    console.error('Exception in getOccupiedSeats:', err);
+    console.error('❌ Exception in getOccupiedSeats:', err);
     return { data: null, error: err };
   }
 }
@@ -604,10 +662,10 @@ export async function getOccupiedSeatsDetailed(
   const supabase = createClient();
   
   try {
+    // Query SEMUA tiket tanpa filter payment_status
     const { data, error } = await supabase
       .from('tiket')
-      .select('data_qr_code')
-      .or(`data_qr_code->>payment_status.eq.menunggu_pembayaran,data_qr_code->>payment_status.eq.terkonfirmasi`);
+      .select('data_qr_code, id');
 
     if (error) {
       console.error('Error getting occupied seats detailed:', error);
@@ -624,12 +682,16 @@ export async function getOccupiedSeatsDetailed(
             : tiket.data_qr_code;
           
           // Filter by train, class, date, time
-          if (
-            qrData.train_name === trainName &&
-            qrData.train_class === trainClass &&
-            qrData.departure_date === departureDate &&
-            qrData.departure_time === departureTime
-          ) {
+          const isMatchingTrain = qrData.train_name === trainName;
+          const isMatchingClass = qrData.train_class === trainClass;
+          const isMatchingDate = qrData.departure_date === departureDate;
+          const isMatchingTime = qrData.departure_time === departureTime;
+          
+          // Accept multiple payment status variants
+          const validStatuses = ['menunggu_pembayaran', 'pending', 'terkonfirmasi', 'paid', 'confirmed'];
+          const isValidStatus = validStatuses.includes(qrData.payment_status?.toLowerCase());
+          
+          if (isMatchingTrain && isMatchingClass && isMatchingDate && isMatchingTime && isValidStatus) {
             const passengersData = qrData.passengers_data;
             if (Array.isArray(passengersData)) {
               passengersData.forEach((passenger: any) => {
