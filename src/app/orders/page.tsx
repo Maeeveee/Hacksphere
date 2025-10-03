@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Clock, MapPin, Train, Users, CreditCard, Wifi, Utensils, Zap, Bed, Star, CheckCircle, AlertCircle } from "lucide-react";
 import UserMenu from "@/components/UserMenu";
+import OCRScanner from "@/components/OCRScanner";
 
 interface BookingFormData {
   gender: string;
@@ -251,6 +252,62 @@ function OrderFormContent() {
       [field]: validatedValue
     };
     setPassengersData(updatedPassengers);
+  };
+
+  // OCR data extraction handler
+  const handleOCRDataExtracted = (passengerIndex: number, ocrData: { nama?: string; nomorIdentitas?: string; tipeIdentitas?: 'nik' | 'paspor' }) => {
+    const updatedPassengers = [...passengersData];
+    const currentPassenger = updatedPassengers[passengerIndex];
+    
+    // Update passenger data with OCR results
+    if (ocrData.nama) {
+      currentPassenger.nama = ocrData.nama;
+    }
+    if (ocrData.nomorIdentitas) {
+      currentPassenger.nomorIdentitas = ocrData.nomorIdentitas;
+    }
+    if (ocrData.tipeIdentitas) {
+      currentPassenger.tipeIdentitas = ocrData.tipeIdentitas;
+    }
+    
+    updatedPassengers[passengerIndex] = currentPassenger;
+    setPassengersData(updatedPassengers);
+    
+    // Show success message
+    alert(`Data berhasil diekstrak untuk penumpang ${passengerIndex + 1}!`);
+  };
+
+  // OCR data extraction handler for booking data
+  const handleBookingOCRDataExtracted = (ocrData: { nama?: string; nomorIdentitas?: string; tipeIdentitas?: 'nik' | 'paspor' }) => {
+    const updatedBookingData = { ...bookingData };
+    
+    // Update booking data with OCR results
+    if (ocrData.nama) {
+      updatedBookingData.nama = ocrData.nama;
+    }
+    if (ocrData.nomorIdentitas) {
+      updatedBookingData.nomorIdentitas = ocrData.nomorIdentitas;
+    }
+    if (ocrData.tipeIdentitas) {
+      updatedBookingData.tipeIdentitas = ocrData.tipeIdentitas;
+    }
+    
+    setBookingData(updatedBookingData);
+    
+    // Auto-update first passenger data if checkbox is checked
+    if (useBookingDataForPassenger && passengersData.length > 0) {
+      const updatedPassengers = [...passengersData];
+      updatedPassengers[0] = {
+        ...updatedPassengers[0],
+        nama: ocrData.nama || updatedPassengers[0].nama,
+        nomorIdentitas: ocrData.nomorIdentitas || updatedPassengers[0].nomorIdentitas,
+        tipeIdentitas: ocrData.tipeIdentitas || updatedPassengers[0].tipeIdentitas,
+      };
+      setPassengersData(updatedPassengers);
+    }
+    
+    // Show success message
+    alert('Data pemesan berhasil diekstrak!');
   };
 
   // Seat selection functions
@@ -507,13 +564,23 @@ function OrderFormContent() {
             {/* Data Pemesanan */}
             <div className="shadow-lg bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg">
               <div className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50 border-b border-gray-100 p-6 rounded-t-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
-                    <Users className="w-5 h-5 text-white" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
+                      <Users className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-xl font-bold text-gray-800">Data Pemesanan</div>
+                      <div className="text-sm text-gray-600">Masukkan data pemesan tiket</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-xl font-bold text-gray-800">Data Pemesanan</div>
-                    <div className="text-sm text-gray-600">Masukkan data pemesan tiket</div>
+                  
+                  {/* OCR Scanner Button for Booking Data */}
+                  <div className="flex items-center gap-2">
+                    <OCRScanner
+                      passengerIndex={-1}
+                      onDataExtracted={handleBookingOCRDataExtracted}
+                    />
                   </div>
                 </div>
               </div>
@@ -637,24 +704,36 @@ function OrderFormContent() {
             {passengersData.map((passenger, index) => (
               <div key={index} className="shadow-lg bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg">
                 <div className="bg-gradient-to-r from-green-50/50 to-emerald-50/50 border-b border-gray-100 p-6 rounded-t-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
-                      <Users className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-xl font-bold text-gray-800">
-                        Data Penumpang {index + 1}
-                        {passenger.ageCategory === 'child' && (
-                          <Badge className="ml-2 bg-orange-100 text-orange-800 text-xs">Anak-anak</Badge>
-                        )}
-                        {passenger.ageCategory === 'adult' && (
-                          <Badge className="ml-2 bg-blue-100 text-blue-800 text-xs">Dewasa</Badge>
-                        )}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
+                        <Users className="w-5 h-5 text-white" />
                       </div>
-                      <div className="text-sm text-gray-600">
-                        Masukkan data penumpang sesuai identitas resmi
+                      <div>
+                        <div className="text-xl font-bold text-gray-800">
+                          Data Penumpang {index + 1}
+                          {passenger.ageCategory === 'child' && (
+                            <Badge className="ml-2 bg-orange-100 text-orange-800 text-xs">Anak-anak</Badge>
+                          )}
+                          {passenger.ageCategory === 'adult' && (
+                            <Badge className="ml-2 bg-blue-100 text-blue-800 text-xs">Dewasa</Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Masukkan data penumpang sesuai identitas resmi
+                        </div>
                       </div>
                     </div>
+                    
+                    {/* OCR Scanner Button */}
+                    {!(useBookingDataForPassenger && index === 0) && (
+                      <div className="flex items-center gap-2">
+                        <OCRScanner
+                          passengerIndex={index}
+                          onDataExtracted={(data) => handleOCRDataExtracted(index, data)}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="p-6 space-y-4">

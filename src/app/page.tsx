@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import MediaSection from "@/components/mediaSection";
 import BookingForm from "@/components/bookingForm";
 import UserMenu from "@/components/UserMenu";
+import Chatbot from "@/components/Chatbot";
 
 export default function Home() {
     useEffect(() => {
@@ -43,6 +44,7 @@ export default function Home() {
                     </div>
                 </div>
             </main>
+             <Chatbot />
         </div>
     );
 }
