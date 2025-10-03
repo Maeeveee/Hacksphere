@@ -429,3 +429,110 @@ export async function getTiketByEmail(email: string): Promise<{ data: Tiket[] | 
 
   return { data: data as Tiket[], error: null };
 }
+
+// Interface untuk occupied seat
+export interface OccupiedSeat {
+  seatNumber: string;
+  passengerName: string;
+  bookingCode: string;
+}
+
+// Fungsi untuk mendapatkan kursi yang sudah terpesan berdasarkan jadwal kereta
+export async function getOccupiedSeats(
+  trainName: string,
+  trainClass: string,
+  departureDate: string,
+  departureTime: string
+): Promise<{ data: string[] | null; error: any }> {
+  const supabase = createClient();
+  
+  try {
+    // Query tiket yang sudah dibooking untuk kereta, kelas, tanggal, dan waktu yang sama
+    // Hanya ambil tiket yang statusnya pending atau paid (tidak termasuk cancelled)
+    const { data, error } = await supabase
+      .from('tiket')
+      .select('passengers_data')
+      .eq('train_name', trainName)
+      .eq('train_class', trainClass)
+      .eq('departure_date', departureDate)
+      .eq('departure_time', departureTime)
+      .in('payment_status', ['pending', 'paid']);
+
+    if (error) {
+      console.error('Error getting occupied seats:', error);
+      return { data: null, error };
+    }
+
+    // Extract seat numbers from passengers_data JSON
+    const occupiedSeats: string[] = [];
+    
+    if (data && data.length > 0) {
+      data.forEach((tiket) => {
+        const passengersData = tiket.passengers_data;
+        if (Array.isArray(passengersData)) {
+          passengersData.forEach((passenger: any) => {
+            if (passenger.selectedSeat && passenger.selectedSeat.seatNumber) {
+              occupiedSeats.push(passenger.selectedSeat.seatNumber);
+            }
+          });
+        }
+      });
+    }
+
+    console.log('Occupied seats from database:', occupiedSeats);
+    return { data: occupiedSeats, error: null };
+  } catch (err) {
+    console.error('Exception in getOccupiedSeats:', err);
+    return { data: null, error: err };
+  }
+}
+
+// Fungsi untuk mendapatkan detail kursi yang sudah terpesan (untuk debugging/admin)
+export async function getOccupiedSeatsDetailed(
+  trainName: string,
+  trainClass: string,
+  departureDate: string,
+  departureTime: string
+): Promise<{ data: OccupiedSeat[] | null; error: any }> {
+  const supabase = createClient();
+  
+  try {
+    const { data, error } = await supabase
+      .from('tiket')
+      .select('booking_code, passengers_data')
+      .eq('train_name', trainName)
+      .eq('train_class', trainClass)
+      .eq('departure_date', departureDate)
+      .eq('departure_time', departureTime)
+      .in('payment_status', ['pending', 'paid']);
+
+    if (error) {
+      console.error('Error getting occupied seats detailed:', error);
+      return { data: null, error };
+    }
+
+    const occupiedSeatsDetailed: OccupiedSeat[] = [];
+    
+    if (data && data.length > 0) {
+      data.forEach((tiket) => {
+        const passengersData = tiket.passengers_data;
+        if (Array.isArray(passengersData)) {
+          passengersData.forEach((passenger: any) => {
+            if (passenger.selectedSeat && passenger.selectedSeat.seatNumber) {
+              occupiedSeatsDetailed.push({
+                seatNumber: passenger.selectedSeat.seatNumber,
+                passengerName: passenger.nama || 'Unknown',
+                bookingCode: tiket.booking_code
+              });
+            }
+          });
+        }
+      });
+    }
+
+    return { data: occupiedSeatsDetailed, error: null };
+  } catch (err) {
+    console.error('Exception in getOccupiedSeatsDetailed:', err);
+    return { data: null, error: err };
+  }
+}
