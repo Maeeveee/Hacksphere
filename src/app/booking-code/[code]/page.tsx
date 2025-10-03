@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Train, MapPin, Clock, User, CreditCard, CheckCircle, Wifi, Utensils, Zap, Bed, Calendar } from "lucide-react";
 import UserMenu from "@/components/UserMenu";
-import { getTiketByBookingCode, Tiket } from "@/lib/supabase/queries";
+import { getTiketByBookingCode, type TiketQRData } from "@/lib/supabase/queries";
 
 interface TicketInfo {
   trainName: string;
@@ -85,8 +85,8 @@ export default function BookingCodePage() {
     fetchTicketData();
   }, [bookingCode]);
 
-  // Helper function to convert Tiket to TicketInfo
-  const convertTiketToTicketInfo = (tiket: Tiket): TicketInfo => {
+  // Helper function to convert TiketQRData to TicketInfo
+  const convertTiketToTicketInfo = (tiket: TiketQRData): TicketInfo => {
     const getStationCode = (stationName: string): string => {
       const stationCodes: { [key: string]: string } = {
         'Jakarta': 'GMR',
@@ -129,9 +129,7 @@ export default function BookingCodePage() {
     const destinationCode = getStationCode(tiket.destination);
 
     // Parse passengers data
-    const passengersData = typeof tiket.passengers_data === 'string' 
-      ? JSON.parse(tiket.passengers_data) 
-      : tiket.passengers_data;
+    const passengersData = tiket.passengers_data;
 
     const firstPassenger = passengersData && passengersData.length > 0 
       ? passengersData[0].nama 
@@ -148,7 +146,7 @@ export default function BookingCodePage() {
       arrivalDate: formatDateTime(tiket.departure_date, tiket.arrival_time),
       seatClass: `${tiket.train_class} (${tiket.train_class.substring(0, 3).toUpperCase()})`,
       seatNumber: getSeatInfo(tiket.train_class),
-      qrCodeValue: `http://localhost:3000/booking-code/${tiket.booking_code}`,
+      qrCodeValue: tiket.qr_code_url || `http://localhost:3000/booking-code/${tiket.booking_code}`,
       paymentStatus: tiket.payment_status,
       totalPrice: tiket.total_price,
       passengersData: passengersData,
@@ -163,7 +161,7 @@ export default function BookingCodePage() {
         class: tiket.train_class,
         price: tiket.price_per_ticket,
         passengers: tiket.passenger_count,
-        facilities: [] // Add facilities if available
+        facilities: tiket.facilities || []
       },
       bookingData: {
         nama: tiket.booker_name,
