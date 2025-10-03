@@ -30,21 +30,35 @@ class RAGService:
         self.tools = self._setup_tools()
         
         # PERBAIKAN 1: Mengajari Agent kapan harus berhenti
+        # GANTI TEMPLATE LAMA ANDA DENGAN YANG BARU INI
+       # GANTI TEMPLATE LAMA ANDA DENGAN YANG BARU INI
         template = """
-Answer the following questions as best you can. You have access to the following tools:
+You are a helpful KAI assistant. Answer the following questions in Indonesian.
+
+You have access to the following tools:
 
 {tools}
 
-Use the following format:
+Here are your instructions on how to format the final answer:
+1.  When you have enough information from a tool, you MUST provide the final answer.
+2.  If the user asks for a schedule, first present the schedule data from the 'Observation' in a clear, friendly list. Convert times to HH:MM format (e.g., 05:03).
+3.  After the schedule list, you MUST create a dynamic booking link.
+4.  The base URL is `http://localhost:3000/tickets`.
+5.  Use the `origin`, `destination`, and `departureDate` (camelCase) from your `Action Input` to create the URL query parameters.
+6.  **IMPORTANT**: For the origin and destination values, use the full station name as provided by the user, including the word "Stasiun" (e.g., `Stasiun+Gambir`, not `Gambir`).
+7.  Add these static parameters: `&adults=1&children=0&isDifabel=false&isPulangPergi=false`.
+8.  Format the link using Markdown, like this: `[Klik di sini untuk melanjutkan pemesanan](YOUR_URL)`.
+
+Now, use the following format for your thought process:
 
 Question: the input question you must answer
-Thought: you should always think about what to do. If you have the result from a tool and believe you can answer the question, you MUST respond with a Final Answer.
+Thought: you should always think about what to do
 Action: the action to take, should be one of [{tool_names}]
-Action Input: the input to the action. For tools with multiple arguments, this MUST be a valid JSON dictionary of the arguments.
+Action Input: the input to the action, as a valid JSON dictionary
 Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
 Thought: I now know the final answer
-Final Answer: the final answer to the original input question. Make sure to present the data from the 'Observation' in a clear, readable, and friendly format.
+Final Answer: [Your final, user-facing answer, formatted in Markdown according to the instructions above]
 
 Begin!
 
@@ -52,7 +66,7 @@ Question: {input}
 Thought:{agent_scratchpad}"""
 
         prompt = ChatPromptTemplate.from_template(template)
-
+        
         agent = create_react_agent(self.llm, self.tools, prompt)
         
         self.agent_executor = AgentExecutor(

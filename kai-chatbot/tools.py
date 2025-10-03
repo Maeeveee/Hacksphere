@@ -1,32 +1,37 @@
 import json
 from datetime import datetime
 from langchain_core.tools import tool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasChoices 
 
-# Model Pydantic tetap kita gunakan sebagai cetakan data yang solid
 class ScheduleInput(BaseModel):
-    origin: str = Field(description="Nama stasiun keberangkatan")
-    destination: str = Field(description="Nama stasiun tujuan")
-    departure_date: str = Field(description="Tanggal keberangkatan dalam format YYYY-MM-DD")
+    origin: str = Field(validation_alias=AliasChoices('origin', 'stasiun_asal', 'station_origin'))
+    destination: str = Field(validation_alias=AliasChoices('destination', 'stasiun_tujuan', 'station_destination'))
+    departureDate: str = Field(validation_alias=AliasChoices('departureDate', 'departure_date', 'date_of_departure', 'tanggal_keberangkatan'))
 
 @tool
 def get_train_schedule(tool_input: str) -> str:
     """
     Gunakan tool ini untuk mencari jadwal kereta api. 
-    Input untuk tool ini HARUS berupa string JSON yang valid dengan kunci: 'origin', 'destination', dan 'departure_date'.
+    Input untuk tool ini HARUS berupa string JSON yang valid dengan kunci: 'origin', 'destination', dan 'departureDate'.
     """
     try:
-        # ==================================================================
-        # LANGKAH KRUSIAL: Parsing string JSON secara manual menjadi objek Pydantic
-        # ==================================================================
-        args = ScheduleInput.model_validate_json(tool_input)
+        # Langkah pembersihan otomatis
+        cleaned_input = tool_input.strip()
+        if (cleaned_input.startswith("'") and cleaned_input.endswith("'")) or \
+           (cleaned_input.startswith('"') and cleaned_input.endswith('"')):
+            cleaned_input = cleaned_input[1:-1]
+        
+        args = ScheduleInput.model_validate_json(cleaned_input)
 
-        # Setelah parsing berhasil, sisa kode berjalan seperti biasa
         origin_station = args.origin
         destination_station = args.destination
-        departure_date_str = args.departure_date
+        departure_date_str = args.departureDate
 
-        # Logika untuk mem-parsing tanggal natural (jika LLM memberikannya)
+        # ==========================================================
+        # LOGIKA BARU: PARSING TANGGAL YANG LEBIH PINTAR
+        # ==========================================================
+        search_date = ""
+        # 1. Coba format natural (contoh: 31 Oktober 2025)
         try:
             import locale
             try:
@@ -35,10 +40,16 @@ def get_train_schedule(tool_input: str) -> str:
                 locale.setlocale(locale.LC_TIME, 'Indonesian_Indonesia.1252')
             
             dt_object = datetime.strptime(departure_date_str, '%d %B %Y')
-            search_date = dt_object.strftime('%Y-%M-%d')
+            search_date = dt_object.strftime('%Y-%m-%d')
         except ValueError:
-            # Jika gagal, asumsikan formatnya sudah YYYY-MM-DD
-            search_date = departure_date_str
+            # 2. Jika gagal, coba format DD-MM-YYYY
+            try:
+                dt_object = datetime.strptime(departure_date_str, '%d-%m-%Y')
+                search_date = dt_object.strftime('%Y-%m-%d')
+            except ValueError:
+                # 3. Jika masih gagal, asumsikan formatnya sudah YYYY-MM-DD
+                search_date = departure_date_str
+        # ==========================================================
             
         print(f"🔎 Mencari jadwal: {origin_station} -> {destination_station} pada {search_date}")
 
@@ -57,4 +68,4 @@ def get_train_schedule(tool_input: str) -> str:
 
     except Exception as e:
         print(f"Error pada tool get_train_schedule: {e}")
-        return f"Terjadi kesalahan saat memproses permintaan Anda. Pastikan format input sudah benar. Error: {str(e)}"
+        return f"Terjadi kesalahan saat memproses permintaan Anda. Error: {str(e)}"
