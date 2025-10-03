@@ -6,7 +6,7 @@ import PaymentInstructions from '@/components/PaymentInstruction';
 import TicketDisplay from '@/components/TicketDisplay';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-import { saveTiket, updatePaymentStatus, type Tiket } from '@/lib/supabase/queries';
+import { saveTiket, updatePaymentStatus, type Tiket, type TiketQRData } from '@/lib/supabase/queries';
 import { CheckCircle2 } from 'lucide-react';
 
 interface BookingFormData {
@@ -246,8 +246,12 @@ function PaymentConfirmationContent() {
             const { orderData, bookingCode: bCode, paymentCode: pCode } = paymentData;
             const { ticketData, bookingData, passengersData } = orderData;
 
-            const tiketData: Omit<Tiket, 'id' | 'created_at' | 'updated_at'> = {
+            // Siapkan data lengkap untuk disimpan di data_qr_code
+            const qrCodeData: TiketQRData = {
+                // Booking Info
                 booking_code: bCode || bookingCode,
+                payment_code: pCode,
+                payment_deadline: new Date(Date.now() + ((paymentData.paymentDeadline || paymentDeadlineInSeconds) * 1000)).toISOString(),
                 
                 // Data Kereta
                 train_id: ticketData.trainId,
@@ -286,9 +290,21 @@ function PaymentConfirmationContent() {
                 payment_status: 'pending',
                 booking_status: 'active',
                 
-                // Metadata
-                payment_code: pCode,
-                payment_deadline: new Date(Date.now() + ((paymentData.paymentDeadline || paymentDeadlineInSeconds) * 1000)).toISOString()
+                // QR Code URL
+                qr_code_url: `http://localhost:3000/booking-code/${bCode || bookingCode}`,
+                
+                // Tambahan (jika ada)
+                facilities: ticketData.facilities || [],
+                payment_method: paymentData.paymentMethod || 'transfer',
+                payment_bank: paymentData.bankName || 'Bank'
+            };
+
+            // Data untuk insert ke tabel tiket
+            const tiketData: Omit<Tiket, 'id' | 'dibuat_pada'> = {
+                id_penumpang: undefined, // Will be set if you have penumpang table
+                id_jadwal: ticketData.trainId, // Assuming this is jadwal ID
+                id_kursi: undefined, // Will be set if you have kursi table
+                data_qr_code: JSON.stringify(qrCodeData)
             };
 
             const { data, error } = await saveTiket(tiketData);

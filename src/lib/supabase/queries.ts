@@ -47,10 +47,22 @@ export interface JadwalLengkap extends Jadwal {
   stasiun_tujuan: Stasiun;
 }
 
-// Interface untuk tabel tiket
+// Interface untuk tabel tiket (struktur baru sesuai database)
 export interface Tiket {
-  id?: string;
+  id?: string;                    // uuid (Primary Key)
+  id_penumpang?: string;          // uuid (foreign key ke tabel penumpang)
+  id_jadwal?: string;             // uuid (foreign key ke tabel jadwal)
+  id_kursi?: string;              // uuid (foreign key ke tabel kursi)
+  data_qr_code: string;           // text (berisi semua data tiket dalam JSON)
+  dibuat_pada?: string;           // timestamptz (auto-generated)
+}
+
+// Interface untuk data yang disimpan dalam data_qr_code (JSON)
+export interface TiketQRData {
+  // Booking Info
   booking_code: string;
+  payment_code?: string;
+  payment_deadline?: string;
   
   // Data Kereta
   train_id?: string;
@@ -76,7 +88,7 @@ export interface Tiket {
   booker_address: string;
   
   // Data Penumpang
-  passengers_data: any; // JSON
+  passengers_data: any; // JSON array
   passenger_count: number;
   adult_count: number;
   child_count: number;
@@ -89,11 +101,15 @@ export interface Tiket {
   payment_status?: 'pending' | 'paid' | 'cancelled';
   booking_status?: 'active' | 'cancelled' | 'completed';
   
-  // Metadata
-  created_at?: string;
-  updated_at?: string;
-  payment_code?: string;
-  payment_deadline?: string;
+  // QR Code
+  qr_code_url?: string;
+  
+  // Tambahan
+  facilities?: string[];
+  seat_numbers?: string[];
+  wagon_number?: string;
+  payment_method?: string;
+  payment_bank?: string;
 }
 
 // Response type untuk queries
@@ -355,7 +371,7 @@ export async function searchJadwalKereta(
 }
 
 // Fungsi untuk menyimpan tiket baru
-export async function saveTiket(tiketData: Omit<Tiket, 'id' | 'created_at' | 'updated_at'>): Promise<{ data: Tiket | null; error: any }> {
+export async function saveTiket(tiketData: Omit<Tiket, 'id' | 'dibuat_pada'>): Promise<{ data: Tiket | null; error: any }> {
   const supabase = createClient();
   
   const { data, error } = await supabase
@@ -373,13 +389,13 @@ export async function saveTiket(tiketData: Omit<Tiket, 'id' | 'created_at' | 'up
 }
 
 // Fungsi untuk mendapatkan tiket berdasarkan booking code
-export async function getTiketByBookingCode(bookingCode: string): Promise<{ data: Tiket | null; error: any }> {
+export async function getTiketByBookingCode(bookingCode: string): Promise<{ data: TiketQRData | null; error: any }> {
   const supabase = createClient();
   
   const { data, error } = await supabase
     .from('tiket')
     .select('*')
-    .eq('booking_code', bookingCode)
+    .eq('data_qr_code->booking_code', bookingCode)
     .single();
 
   if (error) {
@@ -387,20 +403,49 @@ export async function getTiketByBookingCode(bookingCode: string): Promise<{ data
     return { data: null, error };
   }
 
-  return { data: data as Tiket, error: null };
+  // Parse data_qr_code dari JSON string ke object
+  try {
+    const qrData = typeof data.data_qr_code === 'string' 
+      ? JSON.parse(data.data_qr_code) 
+      : data.data_qr_code;
+    return { data: qrData as TiketQRData, error: null };
+  } catch (parseError) {
+    console.error('Error parsing QR data:', parseError);
+    return { data: null, error: parseError };
+  }
 }
 
 // Fungsi untuk update status pembayaran
 export async function updatePaymentStatus(bookingCode: string, status: 'pending' | 'paid' | 'cancelled'): Promise<{ data: Tiket | null; error: any }> {
   const supabase = createClient();
   
+  // First, get the current ticket data
+  const { data: currentData, error: fetchError } = await supabase
+    .from('tiket')
+    .select('*')
+    .eq('data_qr_code->booking_code', bookingCode)
+    .single();
+
+  if (fetchError || !currentData) {
+    console.error('Error fetching tiket for update:', fetchError);
+    return { data: null, error: fetchError };
+  }
+
+  // Parse current QR data
+  const currentQRData = typeof currentData.data_qr_code === 'string'
+    ? JSON.parse(currentData.data_qr_code)
+    : currentData.data_qr_code;
+
+  // Update payment status in QR data
+  currentQRData.payment_status = status;
+
+  // Update the record
   const { data, error } = await supabase
     .from('tiket')
     .update({ 
-      payment_status: status,
-      updated_at: new Date().toISOString()
+      data_qr_code: JSON.stringify(currentQRData)
     })
-    .eq('booking_code', bookingCode)
+    .eq('id', currentData.id)
     .select()
     .single();
 
