@@ -459,7 +459,22 @@ function OrderFormContent() {
         <div className="flex justify-between items-center mb-6">
           <Button 
             variant="outline" 
-            onClick={() => router.back()}
+            onClick={() => {
+              if (ticketData) {
+                const params = new URLSearchParams({
+                  origin: ticketData.origin,
+                  destination: ticketData.destination,
+                  adults: ticketData.adults.toString(),
+                  children: ticketData.children.toString(),
+                  departureDate: ticketData.departureDate,
+                  isDifabel: ticketData.isDifabel.toString(),
+                  isPulangPergi: ticketData.isPulangPergi.toString()
+                });
+                router.push(`/tickets?${params.toString()}`);
+              } else {
+                router.push('/tickets');
+              }
+            }}
             className="bg-white/90 backdrop-blur-md hover:bg-white"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
