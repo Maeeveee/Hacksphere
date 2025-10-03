@@ -37,6 +37,15 @@ export default function MediaSection() {
     <div className="w-full h-full">
       <div className="relative w-full h-full bg-black overflow-hidden">
         
+        {/* KAI Logo - Top Left */}
+        <div className="absolute top-4 left-4 z-20 pointer-events-auto">
+          <img 
+            src="/kai-logo.png" 
+            alt="Kereta Api Indonesia" 
+            className="h-10 md:h-12 w-auto drop-shadow-lg hover:scale-105 transition-transform duration-200"
+          />
+        </div>
+
         {/* Video Background */}
         <video 
           ref={videoRef}
@@ -91,26 +100,31 @@ export default function MediaSection() {
 
         {/* Highlight Text Overlay */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-center px-6 max-w-4xl">
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
+          <div className="text-center px-4 sm:px-6 max-w-4xl">
+            {/* Main Headline - Always visible */}
+            <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-bold text-white mb-3 sm:mb-4 md:mb-6 leading-tight">
               Jelajahi Indonesia dengan 
               <span className="text-orange-500"> Kereta Api</span>
             </h1>
-            <p className="text-xl md:text-2xl text-gray-200 mb-8 leading-relaxed">
+            
+            {/* Subtitle - Hidden on mobile, visible on tablet and up */}
+            <p className="hidden sm:block text-base md:text-xl lg:text-2xl text-gray-200 mb-4 md:mb-8 leading-relaxed">
               Nikmati perjalanan yang nyaman, aman, dan terpercaya ke seluruh destinasi impian Anda
             </p>
-            <div className="flex flex-wrap gap-4 justify-center items-end text-white/90">
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
+            
+            {/* Feature badges - Hidden on mobile, visible on md and up */}
+            <div className="hidden md:flex flex-wrap gap-3 lg:gap-4 justify-center items-end text-white/90">
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3 lg:px-4 py-2 rounded-lg">
                 <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-                <span className="text-sm font-medium">Booking Online</span>
+                <span className="text-xs lg:text-sm font-medium">Booking Online</span>
               </div>
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3 lg:px-4 py-2 rounded-lg">
                 <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-                <span className="text-sm font-medium">Harga Terjangkau</span>
+                <span className="text-xs lg:text-sm font-medium">Harga Terjangkau</span>
               </div>
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg">
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3 lg:px-4 py-2 rounded-lg">
                 <span className="w-2 h-2 bg-purple-400 rounded-full"></span>
-                <span className="text-sm font-medium">Perjalanan Nyaman</span>
+                <span className="text-xs lg:text-sm font-medium">Perjalanan Nyaman</span>
               </div>
             </div>
           </div>
