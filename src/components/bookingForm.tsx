@@ -135,49 +135,52 @@ export default function BookingForm() {
 
     return (
         <>
-            <div className="w-full max-w-md mx-auto">
-                <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-md">
-                <CardHeader className="text-center bg-white/95 rounded-t-lg border-b border-gray-100">
-                    <CardTitle className="text-lg font-bold text-gray-800">
+            <div className="w-full mx-auto">
+                <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md">
+                <CardHeader className="text-center bg-white/95 rounded-t-lg border-b border-gray-100 px-4 py-4 sm:px-6 sm:py-5">
+                    <CardTitle className="text-base sm:text-lg font-bold text-gray-800">
                         Pesan Tiket Kereta Api
                     </CardTitle>
-                    <CardDescription className="text-gray-600 text-sm">
+                    <CardDescription className="text-gray-600 text-xs sm:text-sm">
                         Cari dan pesan tiket perjalanan Anda
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="p-5">
+                <CardContent className="p-4 sm:p-5">
                     {validationMessage && (
-                        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                            <p className="text-red-700 text-sm font-medium">{validationMessage}</p>
+                        <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <p className="text-red-700 text-xs sm:text-sm font-medium">{validationMessage}</p>
                         </div>
                     )}
-                    <form onSubmit={handleSubmit} className="space-y-2">
-                        {/* Origin */}
-                        <div className="space-y-2">
-                            <Label htmlFor="origin" className="text-sm font-semibold text-gray-800">
-                                Stasiun Asal
-                            </Label>
-                            <StasiunSelector
-                                value={bookingData.origin}
-                                onChange={(value) => handleInputChange("origin", value)}
-                                placeholder="Cari stasiun asal..."
-                                className="w-full"
-                                excludeStasiun={bookingData.destination}
-                            />
-                        </div>
+                    <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+                        {/* Origin and Destination - Side by side on mobile, vertical on desktop */}
+                        <div className="grid grid-cols-2 lg:grid-cols-1 gap-2 sm:gap-3 lg:gap-0 lg:space-y-3">
+                            {/* Origin */}
+                            <div className="space-y-2">
+                                <Label htmlFor="origin" className="text-xs sm:text-sm font-semibold text-gray-800">
+                                    Stasiun Asal
+                                </Label>
+                                <StasiunSelector
+                                    value={bookingData.origin}
+                                    onChange={(value) => handleInputChange("origin", value)}
+                                    placeholder="Cari stasiun asal..."
+                                    className="w-full"
+                                    excludeStasiun={bookingData.destination}
+                                />
+                            </div>
 
-                        {/* Destination */}
-                        <div className="space-y-2">
-                            <Label htmlFor="destination" className="text-sm font-semibold text-gray-800">
-                                Stasiun Tujuan
-                            </Label>
-                            <StasiunSelector
-                                value={bookingData.destination}
-                                onChange={(value) => handleInputChange("destination", value)}
-                                placeholder="Cari stasiun tujuan..."
-                                className="w-full"
-                                excludeStasiun={bookingData.origin}
-                            />
+                            {/* Destination */}
+                            <div className="space-y-2">
+                                <Label htmlFor="destination" className="text-xs sm:text-sm font-semibold text-gray-800">
+                                    Stasiun Tujuan
+                                </Label>
+                                <StasiunSelector
+                                    value={bookingData.destination}
+                                    onChange={(value) => handleInputChange("destination", value)}
+                                    placeholder="Cari stasiun tujuan..."
+                                    className="w-full"
+                                    excludeStasiun={bookingData.origin}
+                                />
+                            </div>
                         </div>
 
                         {/* Departure Date */}
@@ -201,7 +204,7 @@ export default function BookingForm() {
                             <Label className="text-sm font-semibold text-gray-800">
                                 Jumlah Penumpang
                             </Label>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-2 sm:gap-3">
                                 <div className="space-y-1">
                                     <Label htmlFor="adults" className="text-xs font-medium text-gray-600">
                                         Dewasa
@@ -214,7 +217,7 @@ export default function BookingForm() {
                                         placeholder="1"
                                         value={bookingData.adults}
                                         onChange={(e) => handleInputChange("adults", parseInt(e.target.value) || 1)}
-                                        className="w-full h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white"
+                                        className="w-full h-9 sm:h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white text-sm"
                                         required
                                     />
                                 </div>
@@ -231,66 +234,70 @@ export default function BookingForm() {
                                         placeholder="0"
                                         value={bookingData.children}
                                         onChange={(e) => handleInputChange("children", parseInt(e.target.value) || 0)}
-                                        className="w-full h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white"
+                                        className="w-full h-9 sm:h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white text-sm"
                                     />
                                 </div>
                             </div>
                         </div>
 
                         {/* Checkbox Options */}
-                        <div className="space-y-3">
-                            <div className="grid grid-cols-2 gap-4">
-                                <Label className="text-sm font-semibold text-gray-800">
-                                    Kebutuhan Khusus
-                                </Label>
-                                <Label className="text-sm font-semibold text-gray-800">
-                                    Paket
-                                </Label>
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                        id="difable"
-                                        checked={bookingData.isDifabel}
-                                        onCheckedChange={(checked) => handleInputChange("isDifabel", checked as boolean)}
-                                        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                                    />
-                                    <Label
-                                        htmlFor="difable"
-                                        className="text-sm text-gray-700 font-medium cursor-pointer"
-                                    >
-                                        Difabel
+                        <div className="space-y-2 sm:space-y-3">
+                            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                                <div>
+                                    <Label className="text-xs sm:text-sm font-semibold text-gray-800 block mb-2">
+                                        Kebutuhan Khusus
                                     </Label>
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="difable"
+                                            checked={bookingData.isDifabel}
+                                            onCheckedChange={(checked) => handleInputChange("isDifabel", checked as boolean)}
+                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                        />
+                                        <Label
+                                            htmlFor="difable"
+                                            className="text-xs sm:text-sm text-gray-700 font-medium cursor-pointer"
+                                        >
+                                            Difabel
+                                        </Label>
+                                    </div>
                                 </div>
 
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                        id="pulangPergi"
-                                        checked={bookingData.isPulangPergi}
-                                        onCheckedChange={(checked) => handleInputChange("isPulangPergi", checked as boolean)}
-                                        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                                    />
-                                    <Label
-                                        htmlFor="pulangPergi"
-                                        className="text-sm text-gray-700 font-medium cursor-pointer"
-                                    >
-                                        Pulang - Pergi
+                                <div>
+                                    <Label className="text-xs sm:text-sm font-semibold text-gray-800 block mb-2">
+                                        Paket
                                     </Label>
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="pulangPergi"
+                                            checked={bookingData.isPulangPergi}
+                                            onCheckedChange={(checked) => handleInputChange("isPulangPergi", checked as boolean)}
+                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                        />
+                                        <Label
+                                            htmlFor="pulangPergi"
+                                            className="text-xs sm:text-sm text-gray-700 font-medium cursor-pointer"
+                                        >
+                                            Pulang - Pergi
+                                        </Label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="grid grid-cols-2 gap-3 mt-5">
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-4 sm:mt-5">
                             <Button
                                 type="button"
                                 variant="outline"
                                 onClick={clearForm}
-                                className="h-10 border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transition-all duration-300"
+                                className="h-9 sm:h-10 border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-lg transition-all duration-300 text-sm"
                             >
                                 Hapus
                             </Button>
                             <Button
                                 type="submit"
-                                className="h-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+                                className="h-9 sm:h-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl text-sm"
                             >
                                 Cari Tiket
                             </Button>
