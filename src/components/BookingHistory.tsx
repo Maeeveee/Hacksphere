@@ -113,7 +113,7 @@ export default function BookingHistory({ isOpen, onClose }: BookingHistoryProps)
     };
 
     const generateQRCodeURL = (bookingCode: string) => {
-        return `https://booking.kai.id/booking-code/${bookingCode}`;
+        return `http://localhost:3000/booking-code/${bookingCode}`;
     };
 
     const showQRCode = (bookingCode: string) => {
