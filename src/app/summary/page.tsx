@@ -178,9 +178,35 @@ function SummaryContent() {
   }, [occupiedSeats, isLoadingSeats, orderData]);
 
   // Seat selection functions
-  const handleSeatSelection = (passengerIndex: number) => {
+  const handleSeatSelection = async (passengerIndex: number) => {
     setCurrentPassengerIndex(passengerIndex);
     setShowSeatModal(true);
+    
+    // Refresh occupied seats data saat modal dibuka
+    // Ini memastikan data kursi selalu up-to-date dari database
+    if (orderData?.ticketData) {
+      setIsLoadingSeats(true);
+      try {
+        console.log('🔄 Refreshing seat data from database...');
+        const { data, error } = await getOccupiedSeats(
+          orderData.ticketData.trainName,
+          orderData.ticketData.class,
+          orderData.ticketData.departureDate,
+          orderData.ticketData.departureTime
+        );
+
+        if (error) {
+          console.error('❌ Error refreshing occupied seats:', error);
+        } else {
+          setOccupiedSeats(data || []);
+          console.log('✅ Seat data refreshed. Occupied seats:', data);
+        }
+      } catch (err) {
+        console.error('❌ Exception refreshing occupied seats:', err);
+      } finally {
+        setIsLoadingSeats(false);
+      }
+    }
   };
 
   const generateSeatMap = () => {
