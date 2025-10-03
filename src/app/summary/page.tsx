@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Clock, MapPin, Train, Users, CreditCard, Wifi, Utensils, Zap, Bed, Star, CheckCircle, AlertTriangle, Edit3, MapPin as Location } from "lucide-react";
 import UserMenu from "@/components/UserMenu";
+import { getOccupiedSeats } from "@/lib/supabase/queries";
 
 interface BookingFormData {
   gender: string;
@@ -75,6 +76,7 @@ function SummaryContent() {
   const [showSeatModal, setShowSeatModal] = useState(false);
   const [currentPassengerIndex, setCurrentPassengerIndex] = useState<number>(-1);
   const [occupiedSeats, setOccupiedSeats] = useState<string[]>([]);
+  const [isLoadingSeats, setIsLoadingSeats] = useState(false);
 
   // Load order data from localStorage
   useEffect(() => {
@@ -92,6 +94,39 @@ function SummaryContent() {
     }
     setIsLoading(false);
   }, [router]);
+
+  // Fetch occupied seats from database when order data is loaded
+  useEffect(() => {
+    const fetchOccupiedSeats = async () => {
+      if (!orderData?.ticketData) return;
+      
+      setIsLoadingSeats(true);
+      try {
+        const { data, error } = await getOccupiedSeats(
+          orderData.ticketData.trainName,
+          orderData.ticketData.class,
+          orderData.ticketData.departureDate,
+          orderData.ticketData.departureTime
+        );
+
+        if (error) {
+          console.error('Error fetching occupied seats:', error);
+          // Fallback to empty array if error
+          setOccupiedSeats([]);
+        } else {
+          setOccupiedSeats(data || []);
+          console.log('📍 Loaded occupied seats from database:', data);
+        }
+      } catch (err) {
+        console.error('Exception fetching occupied seats:', err);
+        setOccupiedSeats([]);
+      } finally {
+        setIsLoadingSeats(false);
+      }
+    };
+
+    fetchOccupiedSeats();
+  }, [orderData]);
 
   // Seat selection functions
   const handleSeatSelection = (passengerIndex: number) => {
@@ -113,20 +148,17 @@ function SummaryContent() {
     const columns = ['A', 'B', 'C', 'D'];
     const seats: SeatData[][] = [];
 
-    // Generate some random occupied seats for demo
-    const randomOccupiedSeats = orderData.ticketData.class?.toLowerCase() === 'eksekutif' 
-      ? ['1A', '2B', '4C', '6D', '8A', '10B'] 
-      : orderData.ticketData.class?.toLowerCase() === 'bisnis'
-      ? ['1A', '1B', '3C', '5D', '7A', '9B', '12C', '15D']
-      : ['1A', '1B', '3C', '5D', '7A', '9B', '12C', '15D', '18A', '19B'];
+    // Gunakan data dari database (occupiedSeats state)
+    // Data ini sudah di-fetch dari database melalui getOccupiedSeats()
+    console.log('🪑 Generating seat map with occupied seats from DB:', occupiedSeats);
 
     for (let row = 1; row <= config.rows; row++) {
       const rowSeats: SeatData[] = [];
       for (let col = 0; col < config.seatsPerRow; col++) {
         const column = columns[col];
         const seatNumber = `${row}${column}`;
-        const isOccupied = randomOccupiedSeats.includes(seatNumber) || 
-                          occupiedSeats.includes(seatNumber) ||
+        // Cek apakah kursi ini ada di database occupied seats ATAU sudah dipilih penumpang lain di session ini
+        const isOccupied = occupiedSeats.includes(seatNumber) ||
                           orderData.passengersData.some(p => p.selectedSeat?.seatNumber === seatNumber);
         
         rowSeats.push({
@@ -557,12 +589,25 @@ function SummaryContent() {
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="text-xl font-bold">Pilih Kursi Penumpang</h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-xl font-bold">Pilih Kursi Penumpang</h3>
+                    {isLoadingSeats && (
+                      <div className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full text-xs">
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Memuat data kursi...
+                      </div>
+                    )}
+                  </div>
                   <p className="text-blue-100 text-sm">
                     {currentPassengerIndex >= 0 && passengersData[currentPassengerIndex]?.nama 
                       ? `Untuk: ${passengersData[currentPassengerIndex].nama}` 
                       : `Penumpang ${currentPassengerIndex + 1}`}
                   </p>
+                  {!isLoadingSeats && occupiedSeats.length > 0 && (
+                    <p className="text-blue-200 text-xs mt-1">
+                      📊 {occupiedSeats.length} kursi sudah terpesan dari database
+                    </p>
+                  )}
                 </div>
                 <button 
                   onClick={() => {setShowSeatModal(false); setCurrentPassengerIndex(-1);}}

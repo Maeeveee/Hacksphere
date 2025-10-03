@@ -132,37 +132,52 @@ function TicketPageContent() {
         }
     }, [searchParams, selectedDate]);
 
-    // Generate array of dates (1 week before and 1 week after selected date)
+    // Generate array of dates (only from today onwards, up to 14 days ahead)
     const generateDateRange = () => {
-        const dates = [];
-        const currentDate = selectedDate ? new Date(selectedDate) : new Date();
+        const dates: Date[] = [];
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset to midnight for accurate comparison
         
-        // 7 days before
-        for (let i = 7; i >= 1; i--) {
-            const date = new Date(currentDate);
-            date.setDate(currentDate.getDate() - i);
-            dates.push(date);
+        const currentDate = selectedDate ? new Date(selectedDate) : new Date();
+        currentDate.setHours(0, 0, 0, 0);
+        
+        // Determine the starting point (either today or selected date if it's in the future)
+        const startDate = currentDate < today ? today : currentDate;
+        
+        // Generate dates: 7 days before selected date (but not before today) and 7 days after
+        for (let i = -7; i <= 7; i++) {
+            const date = new Date(startDate);
+            date.setDate(startDate.getDate() + i);
+            
+            // Only add dates that are today or in the future
+            if (date >= today) {
+                dates.push(date);
+            }
         }
         
-        // Current date
-        dates.push(new Date(currentDate));
-        
-        // 7 days after
-        for (let i = 1; i <= 7; i++) {
-            const date = new Date(currentDate);
-            date.setDate(currentDate.getDate() + i);
-            dates.push(date);
+        // If we don't have enough dates (because some were in the past), add more future dates
+        while (dates.length < 15) {
+            const lastDate: Date = dates[dates.length - 1];
+            const nextDate: Date = new Date(lastDate);
+            nextDate.setDate(lastDate.getDate() + 1);
+            dates.push(nextDate);
         }
         
         return dates;
     };
 
     const formatDateForDisplay = (date: Date) => {
+        // Fix timezone offset issue - use local date instead of UTC
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const fullDate = `${year}-${month}-${day}`;
+        
         return {
             day: date.toLocaleDateString('id-ID', { weekday: 'short' }),
             date: date.getDate(),
             month: date.toLocaleDateString('id-ID', { month: 'short' }),
-            fullDate: date.toISOString().split('T')[0]
+            fullDate: fullDate
         };
     };
 
@@ -493,7 +508,7 @@ function TicketPageContent() {
                             </div>
                         </div>
                     ) : (
-                        <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
+                        <div className="space-y-3 sm:space-y-4">
                         {tickets.map((ticket: TrainTicket) => (
                         <div key={ticket.id} className="group shadow-md sm:shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg sm:rounded-xl">
                             <div className="p-0">
@@ -568,10 +583,12 @@ function TicketPageContent() {
                                     {/* Kolom 3: Harga & Tombol Pesan */}
                                     <div className="lg:col-span-1 flex flex-col justify-center gap-2 sm:gap-3">
                                         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 sm:p-4 rounded-lg text-center">
-                                            <div className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                                            <div className='flex flex-row items-center justify-center'>
+                                                <div className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                                                 {formatPrice(ticket.price)}
                                             </div>
-                                            <div className="text-[10px] sm:text-xs text-gray-600 mt-0.5">per orang</div>
+                                            <div className="text-[15px] sm:text-xs text-gray-600 mt-2">/orang</div>
+                                            </div>
                                         </div>
                                         <Button 
                                             onClick={() => {

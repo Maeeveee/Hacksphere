@@ -460,8 +460,23 @@ function OrderFormContent() {
         <div className="flex justify-between items-center mb-4 sm:mb-6 gap-2">
           <Button 
             variant="outline" 
-            onClick={() => router.back()}
-            className="bg-white/90 backdrop-blur-md hover:bg-white text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
+            onClick={() => {
+              if (ticketData) {
+                const params = new URLSearchParams({
+                  origin: ticketData.origin,
+                  destination: ticketData.destination,
+                  adults: ticketData.adults.toString(),
+                  children: ticketData.children.toString(),
+                  departureDate: ticketData.departureDate,
+                  isDifabel: ticketData.isDifabel.toString(),
+                  isPulangPergi: ticketData.isPulangPergi.toString()
+                });
+                router.push(`/tickets?${params.toString()}`);
+              } else {
+                router.push('/tickets');
+              }
+            }}
+            className="bg-white/90 backdrop-blur-md hover:bg-white"
           >
             <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
             <span className="hidden sm:inline">Kembali ke Daftar Tiket</span>
