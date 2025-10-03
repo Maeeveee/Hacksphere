@@ -465,14 +465,14 @@ function SummaryContent() {
 
           {/* Right Column - Price Summary */}
           <div className="lg:col-span-1">
-            <Card className="sticky top-8 shadow-xl">
-              <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                <CardTitle className="flex items-center gap-2">
+            <div className="sticky top-8 shadow-xl bg-white overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-lg">
+                <div className="flex items-center gap-2 text-white">
                   <CreditCard className="w-5 h-5"/>
                   <span className="text-lg font-semibold">Ringkasan Harga</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
+                </div>
+              </div>
+              <div className="p-6">
                 <div className="space-y-4">
                   {/* Price Breakdown */}
                   <div className="space-y-3">
@@ -544,8 +544,8 @@ function SummaryContent() {
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
       </div>
