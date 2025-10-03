@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, MapPin, Users, Calendar, ArrowLeft, Train, Wifi, Utensils, Zap, Star, ChevronRight, Bed, Loader2 } from "lucide-react";
+import { Clock, MapPin, Users, Calendar, ArrowLeft, Train, Wifi, Utensils, Zap, Star, ChevronRight, Bed, Loader2, ChevronDown, ChevronUp, ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { searchJadwalKereta, type JadwalLengkap } from '@/lib/supabase/queries';
 import UserMenu from '@/components/UserMenu';
@@ -111,15 +111,67 @@ function TicketPageContent() {
     const [tickets, setTickets] = useState<TrainTicket[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [expandedFacilities, setExpandedFacilities] = useState<Set<string>>(new Set());
+    const [selectedDate, setSelectedDate] = useState<string>('');
     
     const ticketSearchParams: TicketSearchParams = {
         origin: searchParams?.get('origin') || '',
         destination: searchParams?.get('destination') || '',
         adults: parseInt(searchParams?.get('adults') || '1'),
         children: parseInt(searchParams?.get('children') || '0'),
-        departureDate: searchParams?.get('departureDate') || '',
+        departureDate: selectedDate || searchParams?.get('departureDate') || '',
         isDifabel: searchParams?.get('isDifabel') === 'true',
         isPulangPergi: searchParams?.get('isPulangPergi') === 'true'
+    };
+
+    // Initialize selected date from URL params
+    useEffect(() => {
+        const dateFromParams = searchParams?.get('departureDate');
+        if (dateFromParams && !selectedDate) {
+            setSelectedDate(dateFromParams);
+        }
+    }, [searchParams, selectedDate]);
+
+    // Generate array of dates (1 week before and 1 week after selected date)
+    const generateDateRange = () => {
+        const dates = [];
+        const currentDate = selectedDate ? new Date(selectedDate) : new Date();
+        
+        // 7 days before
+        for (let i = 7; i >= 1; i--) {
+            const date = new Date(currentDate);
+            date.setDate(currentDate.getDate() - i);
+            dates.push(date);
+        }
+        
+        // Current date
+        dates.push(new Date(currentDate));
+        
+        // 7 days after
+        for (let i = 1; i <= 7; i++) {
+            const date = new Date(currentDate);
+            date.setDate(currentDate.getDate() + i);
+            dates.push(date);
+        }
+        
+        return dates;
+    };
+
+    const formatDateForDisplay = (date: Date) => {
+        return {
+            day: date.toLocaleDateString('id-ID', { weekday: 'short' }),
+            date: date.getDate(),
+            month: date.toLocaleDateString('id-ID', { month: 'short' }),
+            fullDate: date.toISOString().split('T')[0]
+        };
+    };
+
+    const handleDateSelect = (dateString: string) => {
+        setSelectedDate(dateString);
+        // Update URL with new date
+        const params = new URLSearchParams(window.location.search);
+        params.set('departureDate', dateString);
+        router.push(`/tickets?${params.toString()}`);
     };
 
     const totalPassengers = ticketSearchParams.adults + ticketSearchParams.children;
@@ -261,93 +313,76 @@ function TicketPageContent() {
 
     return (
         <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 min-h-screen">
-            <div className="max-w-6xl mx-auto px-4 py-8">
+            <div className="max-w-6xl mx-auto px-2 sm:px-4 py-3 sm:py-8">
                 {/* Header with Back Button and User Menu */}
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-3 sm:mb-6 gap-1.5 sm:gap-2">
                     <Button 
                         variant="outline" 
                         onClick={() => router.back()}
-                        className="bg-white/90 backdrop-blur-md hover:bg-white"
+                        className="bg-white/90 backdrop-blur-md hover:bg-white text-xs sm:text-sm h-8 sm:h-10 px-2 sm:px-4"
                     >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Kembali ke Pencarian
+                        <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                        <span className="hidden sm:inline">Kembali ke Pencarian</span>
+                        <span className="sm:hidden">Kembali</span>
                     </Button>
                     <UserMenu />
                 </div>
 
                 {/* Search Summary */}
-                <div className="mb-8 shadow-xl border border-slate-200/60 bg-gradient-to-r from-white/95 to-blue-50/95 backdrop-blur-md overflow-hidden rounded-xl">
-                    <div className="bg-blue-500 text-white p-6">
-                        <h2 className="text-xl font-bold flex items-center gap-3">
-                            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                                <MapPin className="w-5 h-5 text-white" />
+                <div className="mb-3 sm:mb-4 shadow-xl border border-slate-200/60 bg-gradient-to-r from-white/95 to-blue-50/95 backdrop-blur-md overflow-hidden rounded-lg sm:rounded-xl">
+                    <div className="bg-blue-500 text-white p-3 sm:p-6">
+                        <h2 className="text-sm sm:text-xl font-bold flex items-center gap-1.5 sm:gap-3 flex-wrap">
+                            <div className="w-7 h-7 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                                <MapPin className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-white" />
                             </div>
-                            Hasil Pencarian Tiket
-                            <Badge className="bg-white/20 text-white text-xs">
-                                {tickets.length} kereta ditemukan
+                            <span className="flex-1 min-w-0">Hasil Pencarian Tiket</span>
+                            <Badge className="bg-white/20 text-white text-xs flex-shrink-0 px-1.5 sm:px-2">
+                                {tickets.length} kereta
                             </Badge>
                         </h2>
                     </div>
-                    <div className="pb-6 bg-white p-6">
-                        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="bg-white/80 p-4 rounded-xl shadow-sm border border-blue-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                        <MapPin className="w-4 h-4 text-blue-600" />
+                    <div className="pb-3 sm:pb-6 bg-white p-2 sm:p-6">
+                        <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                            {/* Rute - Full Width */}
+                            <div className="col-span-2 bg-white/80 p-2.5 sm:p-4 rounded-lg sm:rounded-xl shadow-sm border border-blue-100">
+                                <div className="flex items-center gap-1.5 sm:gap-3">
+                                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <MapPin className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-blue-600" />
                                     </div>
-                                    <div>
-                                        <div className="text-xs font-medium text-gray-500 uppercase">Rute</div>
-                                        <div className="font-bold text-gray-800 flex items-center gap-2">
-                                            <span className="text-sm">{ticketSearchParams.origin || 'Stasiun Asal'}</span>
-                                            <ChevronRight className="w-3 h-3 text-gray-400" />
-                                            <span className="text-sm">{ticketSearchParams.destination || 'Stasiun Tujuan'}</span>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="text-xs font-medium text-gray-500 uppercase mb-0.5">Rute</div>
+                                        <div className="font-bold text-gray-800 flex items-center gap-0.5 sm:gap-1 text-xs sm:text-sm">
+                                            <span className="truncate">{ticketSearchParams.origin || 'Asal'}</span>
+                                            <ChevronRight className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
+                                            <span className="truncate">{ticketSearchParams.destination || 'Tujuan'}</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div className="bg-white/80 p-4 rounded-xl shadow-sm border border-green-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                        <Calendar className="w-4 h-4 text-green-600" />
+                            {/* Penumpang - Half Width */}
+                            <div className="bg-white/80 p-2.5 sm:p-4 rounded-lg sm:rounded-xl shadow-sm border border-purple-100">
+                                <div className="flex items-center gap-1.5 sm:gap-3">
+                                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <Users className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-purple-600" />
                                     </div>
-                                    <div>
-                                        <div className="text-xs font-medium text-gray-500 uppercase">Tanggal</div>
-                                        <div className="font-bold text-gray-800 text-sm">
-                                            {ticketSearchParams.departureDate ? 
-                                                new Date(ticketSearchParams.departureDate).toLocaleDateString('id-ID', { 
-                                                    weekday: 'short', 
-                                                    day: 'numeric', 
-                                                    month: 'short' 
-                                                }) 
-                                                : 'Tidak dipilih'
-                                            }
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div className="bg-white/80 p-4 rounded-xl shadow-sm border border-purple-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                                        <Users className="w-4 h-4 text-purple-600" />
-                                    </div>
-                                    <div>
-                                        <div className="text-xs font-medium text-gray-500 uppercase">Penumpang</div>
-                                        <div className="font-bold text-gray-800 text-sm">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="text-xs font-medium text-gray-500 uppercase mb-0.5">Penumpang</div>
+                                        <div className="font-bold text-gray-800 text-xs sm:text-sm truncate">
                                             {ticketSearchParams.adults} Dewasa{ticketSearchParams.children > 0 ? `, ${ticketSearchParams.children} Anak` : ''}
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div className="bg-white/80 p-4 rounded-xl shadow-sm border border-orange-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                                        <Star className="w-4 h-4 text-orange-600" />
+                            {/* Opsi - Half Width */}
+                            <div className="bg-white/80 p-2.5 sm:p-4 rounded-lg sm:rounded-xl shadow-sm border border-orange-100">
+                                <div className="flex items-center gap-1.5 sm:gap-3">
+                                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <Star className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-orange-600" />
                                     </div>
-                                    <div>
-                                        <div className="text-xs font-medium text-gray-500 uppercase">Opsi</div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="text-xs font-medium text-gray-500 uppercase mb-0.5">Opsi</div>
                                         <div className="flex gap-1 flex-wrap">
                                             {ticketSearchParams.isDifabel && (
                                                 <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-700">Difabel</Badge>
@@ -366,10 +401,58 @@ function TicketPageContent() {
                     </div>
                 </div>
 
-                <div className="space-y-4">
+                {/* Date Slider */}
+                <div className="mb-3 sm:mb-6 shadow-lg border border-slate-200/60 bg-white/95 backdrop-blur-md rounded-lg sm:rounded-xl p-3 sm:p-4">
+                    <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0" />
+                        <h3 className="text-xs sm:text-sm font-semibold text-gray-700">Pilih Tanggal Keberangkatan</h3>
+                    </div>
+                    <div className="relative mt-2 sm:mt-3">
+                        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 pb-2">
+                            <div className="flex gap-2 sm:gap-3">
+                                {generateDateRange().map((date, index) => {
+                                    const dateInfo = formatDateForDisplay(date);
+                                    const isSelected = dateInfo.fullDate === selectedDate;
+                                    const isToday = dateInfo.fullDate === new Date().toISOString().split('T')[0];
+                                    
+                                    return (
+                                        <button
+                                            key={index}
+                                            onClick={() => handleDateSelect(dateInfo.fullDate)}
+                                            className={`flex-shrink-0 flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-200 min-w-[60px] sm:min-w-[80px] ${
+                                                isSelected 
+                                                    ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg scale-105' 
+                                                    : isToday
+                                                    ? 'bg-blue-50 text-blue-700 border-2 border-blue-200 hover:bg-blue-100'
+                                                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                            }`}
+                                        >
+                                            <div className="text-[10px] sm:text-xs font-medium uppercase mb-0.5">
+                                                {dateInfo.day}
+                                            </div>
+                                            <div className="text-lg sm:text-2xl font-bold">
+                                                {dateInfo.date}
+                                            </div>
+                                            <div className="text-[10px] sm:text-xs mt-0.5">
+                                                {dateInfo.month}
+                                            </div>
+                                            {isToday && !isSelected && (
+                                                <div className="text-[8px] sm:text-[10px] mt-0.5 font-semibold">
+                                                    Hari ini
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-3 sm:space-y-4">
                     {loading ? (
-                        <div className="shadow-lg border border-gray-200 bg-white rounded-xl">
-                            <div className="p-8 text-center">
+                        <div className="shadow-lg border border-gray-200 bg-white rounded-lg sm:rounded-xl">
+                            <div className="p-6 sm:p-8 text-center">
                                 <div className="flex items-center justify-center gap-3">
                                     <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                                     <span className="text-gray-700 font-medium">Mencari jadwal kereta...</span>
@@ -410,124 +493,119 @@ function TicketPageContent() {
                             </div>
                         </div>
                     ) : (
-                        tickets.map((ticket: TrainTicket) => (
-                        <div key={ticket.id} className="group shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-xl">
+                        <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
+                        {tickets.map((ticket: TrainTicket) => (
+                        <div key={ticket.id} className="group shadow-md sm:shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg sm:rounded-xl">
                             <div className="p-0">
-                                {/* Header Section - Simplified */}
-                                <div className="px-6 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-blue-50/30">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Badge className={`${getClassBadgeColor(ticket.class)} font-medium text-sm px-3 py-1`}>
+                                {/* Header Section */}
+                                <div className="px-2 sm:px-4 py-1.5 sm:py-2 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-blue-50/30">
+                                    <div className="flex items-center justify-between gap-1 sm:gap-2">
+                                        <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                                            <Badge className={`${getClassBadgeColor(ticket.class)} font-medium text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 flex-shrink-0`}>
                                                 {ticket.class}
                                             </Badge>
-                                            <span className="text-sm text-gray-600 font-medium">{ticket.trainNumber}</span>
+                                            <h3 className="font-bold text-xs sm:text-base text-gray-800 truncate">{ticket.trainName}</h3>
+                                            <span className="text-[10px] sm:text-xs text-gray-500 truncate">({ticket.trainNumber})</span>
                                         </div>
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <div className={`w-2 h-2 rounded-full ${ticket.availableSeats > 20 ? 'bg-green-500' : ticket.availableSeats > 10 ? 'bg-yellow-500' : 'bg-red-500'}`} />
-                                            <span>{ticket.availableSeats} kursi tersisa</span>
+                                        <div className="flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-xs text-gray-600 flex-shrink-0">
+                                            <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${ticket.availableSeats > 20 ? 'bg-green-500' : ticket.availableSeats > 10 ? 'bg-yellow-500' : 'bg-red-500'}`} />
+                                            <span className="hidden sm:inline">{ticket.availableSeats} kursi</span>
+                                            <span className="sm:hidden">{ticket.availableSeats}</span>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Main Content */}
-                                <div className="px-6 py-6">
-                                    {/* Main Content Grid - 3 Columns */}
-                                    <div className="grid lg:grid-cols-3 gap-6">
-                                        {/* Left Column - Train Name & Schedule */}
-                                        <div className="lg:col-span-1 space-y-4">
-                                            {/* Train Name Only */}
-                                            <div>
-                                                <h3 className="font-bold text-xl text-gray-800 group-hover:text-blue-700 transition-colors mb-1">
-                                                    {ticket.trainName}
-                                                </h3>
-                                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                                    <Clock className="w-4 h-4 text-blue-500" />
-                                                    <span className="font-medium">{ticket.duration}</span>
+                                {/* Main Content - 3 Columns Layout */}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 p-2 sm:p-4">
+                                    {/* Kolom 1: Jadwal & Jam Keberangkatan */}
+                                    <div className="lg:col-span-1">
+                                        <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs text-gray-600 mb-2">
+                                            <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500" />
+                                            <span className="font-medium">{ticket.duration}</span>
+                                        </div>
+                                        
+                                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-2 sm:p-3">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="text-center flex-1">
+                                                    <div className="text-lg sm:text-xl font-bold text-gray-800">{ticket.departureTime}</div>
+                                                    <div className="text-[10px] sm:text-xs text-gray-600 font-medium bg-white px-2 py-1 rounded-md mt-1 truncate">
+                                                        {ticket.origin}
+                                                    </div>
                                                 </div>
-                                            </div>
-
-                                            {/* Schedule Timeline */}
-                                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4">
-                                                <div className="flex items-center justify-between gap-4">
-                                                    <div className="text-center">
-                                                        <div className="text-2xl font-bold text-gray-800">{ticket.departureTime}</div>
-                                                        <div className="text-sm text-gray-600 font-medium bg-white px-3 py-1.5 rounded-lg mt-2">
-                                                            {ticket.origin}
+                                                <div className="flex-shrink-0 flex items-center relative">
+                                                    <div className="w-8 sm:w-12 h-0.5 bg-gradient-to-r from-blue-400 to-indigo-400"></div>
+                                                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                                                        <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
+                                                            <Train className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white" />
                                                         </div>
                                                     </div>
-                                                    <div className="flex-1 flex items-center relative mx-4">
-                                                        <div className="w-full h-0.5 bg-gradient-to-r from-blue-400 to-indigo-400"></div>
-                                                        <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                                                            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
-                                                                <Train className="w-4 h-4 text-white" />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-center">
-                                                        <div className="text-2xl font-bold text-gray-800">{ticket.arrivalTime}</div>
-                                                        <div className="text-sm text-gray-600 font-medium bg-white px-3 py-1.5 rounded-lg mt-2">
-                                                            {ticket.destination}
-                                                        </div>
+                                                </div>
+                                                <div className="text-center flex-1">
+                                                    <div className="text-lg sm:text-xl font-bold text-gray-800">{ticket.arrivalTime}</div>
+                                                    <div className="text-[10px] sm:text-xs text-gray-600 font-medium bg-white px-2 py-1 rounded-md mt-1 truncate">
+                                                        {ticket.destination}
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
 
-                                        {/* Middle Column - Facilities */}
-                                        <div className="lg:col-span-1">
-                                            <div className="text-sm font-semibold text-gray-700 mb-3">Fasilitas Tersedia</div>
-                                            <div className="grid grid-cols-1 gap-2">
-                                                {ticket.facilities.map((facility, index) => (
-                                                    <div key={index} className="flex items-center gap-3 bg-gray-50 px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors">
-                                                        <div className="text-blue-600 flex-shrink-0">
-                                                            {getFacilityIcon(facility)}
-                                                        </div>
-                                                        <span className="text-sm font-medium text-gray-700">{facility}</span>
+                                    {/* Kolom 2: Fasilitas */}
+                                    <div className="lg:col-span-1">
+                                        <div className="text-xs sm:text-sm font-semibold text-gray-700 mb-2">Fasilitas</div>
+                                        <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                                            {ticket.facilities.map((facility, index) => (
+                                                <div key={index} className="flex items-center gap-1 bg-gray-50 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md hover:bg-blue-50 transition-colors">
+                                                    <div className="text-blue-600 flex-shrink-0">
+                                                        {getFacilityIcon(facility)}
                                                     </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {/* Right Column - Price & Action */}
-                                        <div className="lg:col-span-1 flex flex-col justify-center items-center space-y-4">
-                                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 rounded-xl w-full text-center">
-                                                <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                                                    {formatPrice(ticket.price)}
+                                                    <span className="text-[10px] sm:text-xs font-medium text-gray-700">{facility}</span>
                                                 </div>
-                                            </div>
-                                            <Button 
-                                                onClick={() => {
-                                                    // Create ticket data with passenger info
-                                                    const ticketData = {
-                                                        ...ticket,
-                                                        passengers: totalPassengers,
-                                                        adults: ticketSearchParams.adults,
-                                                        children: ticketSearchParams.children,
-                                                        departureDate: ticketSearchParams.departureDate,
-                                                        totalPrice: ticket.price * totalPassengers,
-                                                        isDifabel: ticketSearchParams.isDifabel,
-                                                        isPulangPergi: ticketSearchParams.isPulangPergi
-                                                    };
-
-                                                    // Navigate to orders with ticket data
-                                                    const queryString = new URLSearchParams({
-                                                        ticketData: JSON.stringify(ticketData)
-                                                    }).toString();
-                                                    
-                                                    router.push(`/orders?${queryString}`);
-                                                }}
-                                                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 group"
-                                            >
-                                                <span>Pilih Kereta</span>
-                                                <ChevronRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                                            </Button>
-                                            <div className="text-xs text-gray-500 text-center">Pembayaran aman & terpercaya</div>
+                                            ))}
                                         </div>
+                                    </div>
+
+                                    {/* Kolom 3: Harga & Tombol Pesan */}
+                                    <div className="lg:col-span-1 flex flex-col justify-center gap-2 sm:gap-3">
+                                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 sm:p-4 rounded-lg text-center">
+                                            <div className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                                                {formatPrice(ticket.price)}
+                                            </div>
+                                            <div className="text-[10px] sm:text-xs text-gray-600 mt-0.5">per orang</div>
+                                        </div>
+                                        <Button 
+                                            onClick={() => {
+                                                // Create ticket data with passenger info
+                                                const ticketData = {
+                                                    ...ticket,
+                                                    passengers: totalPassengers,
+                                                    adults: ticketSearchParams.adults,
+                                                    children: ticketSearchParams.children,
+                                                    departureDate: ticketSearchParams.departureDate,
+                                                    totalPrice: ticket.price * totalPassengers,
+                                                    isDifabel: ticketSearchParams.isDifabel,
+                                                    isPulangPergi: ticketSearchParams.isPulangPergi
+                                                };
+
+                                                // Navigate to orders with ticket data
+                                                const queryString = new URLSearchParams({
+                                                    ticketData: JSON.stringify(ticketData)
+                                                }).toString();
+                                                
+                                                router.push(`/orders?${queryString}`);
+                                            }}
+                                            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 group"
+                                        >
+                                            <span className="hidden sm:inline">Pesan Sekarang</span>
+                                            <span className="sm:hidden">Pesan</span>
+                                            <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2 group-hover:translate-x-1 transition-transform inline-block" />
+                                        </Button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    ))
+                    ))}
+                    </div>
                     )}
                 </div>
             </div>
