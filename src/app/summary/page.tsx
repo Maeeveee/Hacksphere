@@ -3,10 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Suspense } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Clock, MapPin, Train, Users, CreditCard, Wifi, Utensils, Zap, Bed, Star, CheckCircle, AlertTriangle, Edit3, MapPin as Location } from "lucide-react";
@@ -127,6 +123,59 @@ function SummaryContent() {
 
     fetchOccupiedSeats();
   }, [orderData]);
+
+  // Auto-assign seats when occupied seats are loaded and passengers don't have seats yet
+  useEffect(() => {
+    if (!orderData || isLoadingSeats || occupiedSeats.length === 0) return;
+    
+    // Check if any passenger doesn't have a seat yet
+    const hasUnassignedSeats = orderData.passengersData.some(p => !p.selectedSeat);
+    if (!hasUnassignedSeats) return; // All passengers already have seats
+    
+    console.log('🎯 Auto-assigning seats for passengers...');
+    
+    const seatMap = generateSeatMap();
+    const availableSeats: SeatData[] = [];
+    
+    // Collect all available seats
+    seatMap.forEach(row => {
+      row.forEach(seat => {
+        if (!seat.isOccupied) {
+          availableSeats.push(seat);
+        }
+      });
+    });
+
+    // Check if we have enough available seats
+    if (availableSeats.length < orderData.passengersData.length) {
+      console.warn(`⚠️ Not enough seats available. Only ${availableSeats.length} seats for ${orderData.passengersData.length} passengers.`);
+      return;
+    }
+
+    // Assign seats to passengers who don't have one
+    const updatedPassengers = [...orderData.passengersData];
+    let seatIndex = 0;
+    
+    for (let i = 0; i < updatedPassengers.length; i++) {
+      if (!updatedPassengers[i].selectedSeat) {
+        updatedPassengers[i] = {
+          ...updatedPassengers[i],
+          selectedSeat: availableSeats[seatIndex]
+        };
+        seatIndex++;
+      }
+    }
+    
+    const updatedOrderData = {
+      ...orderData,
+      passengersData: updatedPassengers
+    };
+    
+    setOrderData(updatedOrderData);
+    localStorage.setItem('orderData', JSON.stringify(updatedOrderData));
+    
+    console.log('✅ Auto-assigned seats successfully!');
+  }, [occupiedSeats, isLoadingSeats, orderData]);
 
   // Seat selection functions
   const handleSeatSelection = (passengerIndex: number) => {
@@ -310,9 +359,9 @@ function SummaryContent() {
           <div className="lg:col-span-2 space-y-6">
             
             {/* Trip Information */}
-            <Card className="shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
-                <CardTitle className="flex items-center gap-3">
+            <div className="shadow-lg bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50 border-b border-gray-100 p-6 rounded-t-lg">
+                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
                     <Train className="w-5 h-5 text-white" />
                   </div>
@@ -320,9 +369,9 @@ function SummaryContent() {
                     <div className="text-xl font-bold text-gray-800">Informasi Perjalanan</div>
                     <div className="text-sm text-gray-600">{ticketData.trainName} - {ticketData.trainNumber}</div>
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
+                </div>
+              </div>
+              <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
@@ -365,13 +414,13 @@ function SummaryContent() {
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Booker Information */}
-            <Card className="shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-green-50/50 to-emerald-50/50">
-                <CardTitle className="flex items-center gap-3">
+            <div className="shadow-lg bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-green-50/50 to-emerald-50/50 border-b border-gray-100 p-6 rounded-t-lg">
+                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
                     <Users className="w-5 h-5 text-white" />
                   </div>
@@ -379,9 +428,9 @@ function SummaryContent() {
                     <div className="text-xl font-bold text-gray-800">Data Pemesan</div>
                     <div className="text-sm text-gray-600">Informasi kontak dan identitas pemesan</div>
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
+                </div>
+              </div>
+              <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <div className="text-sm text-gray-600">Nama Pemesan</div>
@@ -406,23 +455,23 @@ function SummaryContent() {
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Passengers Information with Seat Selection */}
-            <Card className="shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-purple-50/50 to-pink-50/50">
-                <CardTitle className="flex items-center gap-3">
+            <div className="shadow-lg bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-purple-50/50 to-pink-50/50 border-b border-gray-100 p-6 rounded-t-lg">
+                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
                     <Users className="w-5 h-5 text-white" />
                   </div>
                   <div>
                     <div className="text-xl font-bold text-gray-800">Data Penumpang & Kursi</div>
-                    <div className="text-sm text-gray-600">Daftar penumpang dan pilihan kursi</div>
+                    <div className="text-sm text-gray-600">Daftar penumpang dan pilihan kursi (dipilih otomatis)</div>
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
+                </div>
+              </div>
+              <div className="p-6">
                 <div className="space-y-6">
                   {passengersData.map((passenger, index) => (
                     <div key={index} className="border border-gray-200 rounded-lg p-4">
@@ -491,8 +540,8 @@ function SummaryContent() {
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
 
           {/* Right Column - Price Summary */}
