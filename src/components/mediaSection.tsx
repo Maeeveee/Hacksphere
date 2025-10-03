@@ -37,6 +37,15 @@ export default function MediaSection() {
     <div className="w-full h-full">
       <div className="relative w-full h-full bg-black overflow-hidden">
         
+        {/* KAI Logo - Top Left */}
+        <div className="absolute top-4 left-4 z-20 pointer-events-auto">
+          <img 
+            src="/kai-logo.png" 
+            alt="Kereta Api Indonesia" 
+            className="h-10 md:h-12 w-auto drop-shadow-lg hover:scale-105 transition-transform duration-200"
+          />
+        </div>
+
         {/* Video Background */}
         <video 
           ref={videoRef}

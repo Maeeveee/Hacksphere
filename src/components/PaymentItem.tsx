@@ -37,7 +37,7 @@ export default function PaymentItem({ bankName, logoSrc, instructions }: Payment
                     {/* Modifikasi tombol ini */}
                     <Button 
                         onClick={handlePayment} 
-                        className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
+                        className="w-full mt-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:bg-gradient-to-l"
                     >
                         Bayar dengan {bankName}
                     </Button>

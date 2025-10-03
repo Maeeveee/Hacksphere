@@ -156,17 +156,20 @@ function PaymentPageContent() {
     // Cleanup function to clear data when component unmounts
     return () => {
       // Only clear if user is navigating away from payment flow
+      // Keep data when going back to summary or orders
       if (window.location.pathname !== '/orders/payment' && 
-          !window.location.pathname.includes('/orders/payment/')) {
+          !window.location.pathname.includes('/orders/payment/') &&
+          window.location.pathname !== '/summary' &&
+          window.location.pathname !== '/orders') {
         localStorage.removeItem('orderData');
       }
     };
   }, [router]);
 
   const handleBackClick = () => {
-    // Don't clear localStorage when going back to orders page
-    // so user can modify their data if needed
-    router.push('/orders');
+    // Don't clear localStorage when going back to summary page
+    // so user can modify their seat selection if needed
+    router.push('/summary');
   };
 
   if (isLoading) {
@@ -201,17 +204,21 @@ function PaymentPageContent() {
         
         {/* Header Halaman */}
         <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center">
-            <Button 
-              variant="outline" 
-              onClick={handleBackClick}
-              className="rounded-full h-10 w-10 p-0 mr-4 bg-white/80 backdrop-blur-sm hover:bg-white"
-            >
-              <ArrowLeft className="h-5 w-5 text-gray-700" />
-            </Button>
-            <h1 className="text-3xl font-bold text-slate-800">Pembayaran</h1>
-          </div>
+          <Button 
+            variant="outline" 
+            onClick={handleBackClick}
+            className="bg-white/90 backdrop-blur-md hover:bg-white"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Kembali ke Ringkasan
+          </Button>
           <UserMenu />
+        </div>
+
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Pembayaran</h1>
+          <p className="text-gray-600">Pilih metode pembayaran untuk menyelesaikan transaksi</p>
         </div>
 
         {/* Konten Utama */}
