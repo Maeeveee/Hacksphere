@@ -17,6 +17,9 @@ interface TicketSearchParams {
     departureDate: string;
     isDifabel: boolean;
     isPulangPergi: boolean;
+    returnDate?: string;
+    returnOrigin?: string;
+    returnDestination?: string;
 }
 
 interface TrainTicket {
@@ -121,12 +124,30 @@ function TicketPageContent() {
         children: parseInt(searchParams?.get('children') || '0'),
         departureDate: selectedDate || searchParams?.get('departureDate') || '',
         isDifabel: searchParams?.get('isDifabel') === 'true',
-        isPulangPergi: searchParams?.get('isPulangPergi') === 'true'
+        isPulangPergi: searchParams?.get('isPulangPergi') === 'true',
+        returnDate: searchParams?.get('returnDate') || undefined,
+        returnOrigin: searchParams?.get('returnOrigin') || undefined,
+        returnDestination: searchParams?.get('returnDestination') || undefined,
     };
+
+    // Check if this is return trip selection page
+    const isReturnTrip = searchParams?.get('isReturnTrip') === 'true';
+    const [departureTicket, setDepartureTicket] = useState<any>(null);
+
+    // Load departure ticket if this is return trip page
+    useEffect(() => {
+        if (isReturnTrip) {
+            const saved = localStorage.getItem('departureTicket');
+            if (saved) {
+                setDepartureTicket(JSON.parse(saved));
+            }
+        }
+    }, [isReturnTrip]);
 
     // Initialize selected date from URL params
     useEffect(() => {
         const dateFromParams = searchParams?.get('departureDate');
+        
         if (dateFromParams && !selectedDate) {
             setSelectedDate(dateFromParams);
         }
@@ -138,19 +159,40 @@ function TicketPageContent() {
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Reset to midnight for accurate comparison
         
-        const currentDate = selectedDate ? new Date(selectedDate) : new Date();
-        currentDate.setHours(0, 0, 0, 0);
+        // Untuk return trip, gunakan returnDate dari params jika ada
+        // Untuk departure trip, gunakan selectedDate
+        let baseDate: Date;
+        let minDate: Date; // Minimum date yang bisa dipilih
         
-        // Determine the starting point (either today or selected date if it's in the future)
-        const startDate = currentDate < today ? today : currentDate;
+        if (isReturnTrip) {
+            // Di return page, departureDate di URL adalah tanggal return yang diinput user
+            const returnDateParam = searchParams?.get('departureDate');
+            baseDate = returnDateParam ? new Date(returnDateParam) : new Date();
+            
+            // Minimum date adalah yang lebih besar antara: hari ini atau tanggal berangkat
+            if (departureTicket && departureTicket.departureDate) {
+                const departureDateObj = new Date(departureTicket.departureDate);
+                departureDateObj.setHours(0, 0, 0, 0);
+                minDate = departureDateObj > today ? departureDateObj : today;
+            } else {
+                minDate = today;
+            }
+        } else {
+            baseDate = selectedDate ? new Date(selectedDate) : new Date();
+            minDate = today;
+        }
+        baseDate.setHours(0, 0, 0, 0);
         
-        // Generate dates: 7 days before selected date (but not before today) and 7 days after
+        // Pastikan baseDate tidak lebih awal dari minDate
+        const startDate = baseDate < minDate ? minDate : baseDate;
+        
+        // Generate dates: 7 days before selected date (but not before minDate) and 7 days after
         for (let i = -7; i <= 7; i++) {
             const date = new Date(startDate);
             date.setDate(startDate.getDate() + i);
             
-            // Only add dates that are today or in the future
-            if (date >= today) {
+            // Only add dates that are >= minDate
+            if (date >= minDate) {
                 dates.push(date);
             }
         }
@@ -182,6 +224,20 @@ function TicketPageContent() {
     };
 
     const handleDateSelect = (dateString: string) => {
+        // Validasi: untuk return trip, tidak boleh pilih tanggal lebih awal dari departure
+        if (isReturnTrip && departureTicket && departureTicket.departureDate) {
+            const selectedDateObj = new Date(dateString);
+            const departureDateObj = new Date(departureTicket.departureDate);
+            selectedDateObj.setHours(0, 0, 0, 0);
+            departureDateObj.setHours(0, 0, 0, 0);
+            
+            if (selectedDateObj < departureDateObj) {
+                // Jangan izinkan pilih tanggal lebih awal dari departure
+                console.warn('⚠️ Tanggal pulang tidak boleh lebih awal dari tanggal berangkat');
+                return;
+            }
+        }
+        
         setSelectedDate(dateString);
         // Update URL with new date
         const params = new URLSearchParams(window.location.search);
@@ -345,27 +401,38 @@ function TicketPageContent() {
 
                 {/* Search Summary */}
                 <div className="mb-3 sm:mb-4 shadow-xl border border-slate-200/60 bg-gradient-to-r from-white/95 to-blue-50/95 backdrop-blur-md overflow-hidden rounded-lg sm:rounded-xl">
-                    <div className="bg-blue-500 text-white p-3 sm:p-6">
+                    <div className={`${isReturnTrip ? 'bg-orange-500' : 'bg-blue-500'} text-white p-3 sm:p-6`}>
                         <h2 className="text-sm sm:text-xl font-bold flex items-center gap-1.5 sm:gap-3 flex-wrap">
                             <div className="w-7 h-7 sm:w-10 sm:h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
-                                <MapPin className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-white" />
+                                {isReturnTrip ? (
+                                    <ChevronLeft className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-white" />
+                                ) : (
+                                    <MapPin className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-white" />
+                                )}
                             </div>
-                            <span className="flex-1 min-w-0">Hasil Pencarian Tiket</span>
+                            <span className="flex-1 min-w-0">
+                                {isReturnTrip ? 'Pilih Tiket Pulang' : 'Hasil Pencarian Tiket'}
+                            </span>
                             <Badge className="bg-white/20 text-white text-xs flex-shrink-0 px-1.5 sm:px-2">
                                 {tickets.length} kereta
                             </Badge>
                         </h2>
+                        {isReturnTrip && departureTicket && (
+                            <p className="text-xs sm:text-sm text-white/90 mt-2">
+                                ✓ Tiket berangkat: {departureTicket.trainName} • {departureTicket.departureTime}
+                            </p>
+                        )}
                     </div>
                     <div className="pb-3 sm:pb-6 bg-white p-2 sm:p-6">
                         <div className="grid grid-cols-2 gap-2 sm:gap-4">
                             {/* Rute - Full Width */}
-                            <div className="col-span-2 bg-white/80 p-2.5 sm:p-4 rounded-lg sm:rounded-xl shadow-sm border border-blue-100">
+                            <div className={`col-span-2 bg-white/80 p-2.5 sm:p-4 rounded-lg sm:rounded-xl shadow-sm border ${isReturnTrip ? 'border-orange-100' : 'border-blue-100'}`}>
                                 <div className="flex items-center gap-1.5 sm:gap-3">
-                                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                        <MapPin className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-blue-600" />
+                                    <div className={`w-6 h-6 sm:w-8 sm:h-8 ${isReturnTrip ? 'bg-orange-100' : 'bg-blue-100'} rounded-full flex items-center justify-center flex-shrink-0`}>
+                                        <MapPin className={`w-2.5 h-2.5 sm:w-4 sm:h-4 ${isReturnTrip ? 'text-orange-600' : 'text-blue-600'}`} />
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <div className="text-xs font-medium text-gray-500 uppercase mb-0.5">Rute</div>
+                                        <div className="text-xs font-medium text-gray-500 uppercase mb-0.5">{isReturnTrip ? 'Rute Pulang' : 'Rute'}</div>
                                         <div className="font-bold text-gray-800 flex items-center gap-0.5 sm:gap-1 text-xs sm:text-sm">
                                             <span className="truncate">{ticketSearchParams.origin || 'Asal'}</span>
                                             <ChevronRight className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
@@ -418,9 +485,18 @@ function TicketPageContent() {
 
                 {/* Date Slider */}
                 <div className="mb-3 sm:mb-6 shadow-lg border border-slate-200/60 bg-white/95 backdrop-blur-md rounded-lg sm:rounded-xl p-3 sm:p-4">
-                    <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0" />
-                        <h3 className="text-xs sm:text-sm font-semibold text-gray-700">Pilih Tanggal Keberangkatan</h3>
+                    <div className="flex items-center gap-2 justify-between">
+                        <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0" />
+                            <h3 className="text-xs sm:text-sm font-semibold text-gray-700">
+                                {isReturnTrip ? 'Pilih Tanggal Pulang' : 'Pilih Tanggal Keberangkatan'}
+                            </h3>
+                        </div>
+                        {isReturnTrip && departureTicket && (
+                            <div className="text-[10px] sm:text-xs text-gray-500 bg-blue-50 px-2 py-1 rounded-md">
+                                Min: {new Date(departureTicket.departureDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </div>
+                        )}
                     </div>
                     <div className="relative mt-2 sm:mt-3">
                         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 pb-2">
@@ -430,12 +506,25 @@ function TicketPageContent() {
                                     const isSelected = dateInfo.fullDate === selectedDate;
                                     const isToday = dateInfo.fullDate === new Date().toISOString().split('T')[0];
                                     
+                                    // Check if date is disabled (untuk return trip, tidak boleh lebih awal dari departure)
+                                    let isDisabled = false;
+                                    if (isReturnTrip && departureTicket && departureTicket.departureDate) {
+                                        const currentDateObj = new Date(dateInfo.fullDate);
+                                        const departureDateObj = new Date(departureTicket.departureDate);
+                                        currentDateObj.setHours(0, 0, 0, 0);
+                                        departureDateObj.setHours(0, 0, 0, 0);
+                                        isDisabled = currentDateObj < departureDateObj;
+                                    }
+                                    
                                     return (
                                         <button
                                             key={index}
-                                            onClick={() => handleDateSelect(dateInfo.fullDate)}
+                                            onClick={() => !isDisabled && handleDateSelect(dateInfo.fullDate)}
+                                            disabled={isDisabled}
                                             className={`flex-shrink-0 flex flex-col items-center justify-center p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-200 min-w-[60px] sm:min-w-[80px] ${
-                                                isSelected 
+                                                isDisabled
+                                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
+                                                    : isSelected 
                                                     ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg scale-105' 
                                                     : isToday
                                                     ? 'bg-blue-50 text-blue-700 border-2 border-blue-200 hover:bg-blue-100'
@@ -451,7 +540,7 @@ function TicketPageContent() {
                                             <div className="text-[10px] sm:text-xs mt-0.5">
                                                 {dateInfo.month}
                                             </div>
-                                            {isToday && !isSelected && (
+                                            {isToday && !isSelected && !isDisabled && (
                                                 <div className="text-[8px] sm:text-[10px] mt-0.5 font-semibold">
                                                     Hari ini
                                                 </div>
@@ -509,7 +598,60 @@ function TicketPageContent() {
                         </div>
                     ) : (
                         <div className="space-y-3 sm:space-y-4">
-                        {tickets.map((ticket: TrainTicket) => (
+                        {(() => {
+                            // Filter tickets untuk return trip jika tanggal sama dengan departure
+                            let filteredTickets = tickets;
+                            
+                            if (isReturnTrip && departureTicket) {
+                                const departureDate = departureTicket.departureDate; // Format: YYYY-MM-DD
+                                const returnDate = ticketSearchParams.departureDate; // Di return page, ini adalah return date
+                                
+                                // Jika tanggal sama, filter berdasarkan jam
+                                if (departureDate === returnDate) {
+                                    const departureArrivalTime = departureTicket.arrivalTime; // Format: HH:MM
+                                    
+                                    filteredTickets = tickets.filter(ticket => {
+                                        // Compare jam keberangkatan return dengan jam kedatangan departure
+                                        const [depHour, depMin] = departureArrivalTime.split(':').map(Number);
+                                        const [retHour, retMin] = ticket.departureTime.split(':').map(Number);
+                                        
+                                        const depTimeInMinutes = depHour * 60 + depMin;
+                                        const retTimeInMinutes = retHour * 60 + retMin;
+                                        
+                                        // Return ticket harus berangkat setelah departure ticket tiba
+                                        return retTimeInMinutes > depTimeInMinutes;
+                                    });
+                                    
+                                    console.log('🔍 Filter return tickets pada tanggal sama:', {
+                                        departureDate,
+                                        returnDate,
+                                        departureArrivalTime,
+                                        totalTickets: tickets.length,
+                                        filteredTickets: filteredTickets.length
+                                    });
+                                }
+                            }
+                            
+                            return filteredTickets.length === 0 ? (
+                                <div className="shadow-lg border border-gray-200 bg-white rounded-xl">
+                                    <div className="p-8 text-center">
+                                        <Train className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                                        <div className="text-gray-700 font-medium mb-2">Tidak ada jadwal kereta yang tersedia</div>
+                                        <div className="text-gray-500 text-sm mb-4">
+                                            {isReturnTrip && departureTicket && departureTicket.departureDate === ticketSearchParams.departureDate
+                                                ? `Tidak ada kereta yang berangkat setelah jam ${departureTicket.arrivalTime} (waktu kedatangan tiket berangkat).`
+                                                : `Tidak ada kereta yang beroperasi untuk rute ${ticketSearchParams.origin} → ${ticketSearchParams.destination} pada tanggal yang dipilih.`
+                                            }
+                                        </div>
+                                        <Button 
+                                            onClick={() => router.push('/')}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                                        >
+                                            Coba Tanggal Lain
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : filteredTickets.map((ticket: TrainTicket) => (
                         <div key={ticket.id} className="group shadow-md sm:shadow-lg border border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg sm:rounded-xl">
                             <div className="p-0">
                                 {/* Header Section */}
@@ -604,16 +746,38 @@ function TicketPageContent() {
                                                     isPulangPergi: ticketSearchParams.isPulangPergi
                                                 };
 
-                                                // Navigate to orders with ticket data
-                                                const queryString = new URLSearchParams({
-                                                    ticketData: JSON.stringify(ticketData)
-                                                }).toString();
-                                                
-                                                router.push(`/orders?${queryString}`);
+                                                // Jika PP, redirect ke halaman pilih tiket pulang
+                                                if (ticketSearchParams.isPulangPergi) {
+                                                    // Save departure ticket to localStorage
+                                                    localStorage.setItem('departureTicket', JSON.stringify(ticketData));
+                                                    
+                                                    // Redirect to return ticket selection page
+                                                    const returnParams = new URLSearchParams({
+                                                        origin: ticketSearchParams.returnOrigin || ticketSearchParams.destination || '',
+                                                        destination: ticketSearchParams.returnDestination || ticketSearchParams.origin || '',
+                                                        adults: ticketSearchParams.adults.toString(),
+                                                        children: ticketSearchParams.children.toString(),
+                                                        departureDate: ticketSearchParams.returnDate || '',
+                                                        isDifabel: ticketSearchParams.isDifabel.toString(),
+                                                        isPulangPergi: 'false',
+                                                        isReturnTrip: 'true' // Flag untuk tanda ini halaman pilih tiket pulang
+                                                    });
+                                                    
+                                                    router.push(`/tickets?${returnParams.toString()}`);
+                                                } else {
+                                                    // Navigate to orders with ticket data (one-way)
+                                                    const queryString = new URLSearchParams({
+                                                        ticketData: JSON.stringify(ticketData)
+                                                    }).toString();
+                                                    
+                                                    router.push(`/orders?${queryString}`);
+                                                }
                                             }}
                                             className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 group"
                                         >
-                                            <span className="hidden sm:inline">Pesan Sekarang</span>
+                                            <span className="hidden sm:inline">
+                                                {ticketSearchParams.isPulangPergi ? 'Pilih Tiket Berangkat' : 'Pesan Sekarang'}
+                                            </span>
                                             <span className="sm:hidden">Pesan</span>
                                             <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2 group-hover:translate-x-1 transition-transform inline-block" />
                                         </Button>
@@ -621,7 +785,7 @@ function TicketPageContent() {
                                 </div>
                             </div>
                         </div>
-                    ))}
+                    ))})()}
                     </div>
                     )}
                 </div>
