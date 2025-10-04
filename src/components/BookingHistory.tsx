@@ -36,6 +36,7 @@ interface BookingHistoryItem {
     bankName?: string;
     completedAt: string;
     status: string;
+    tripType?: 'berangkat' | 'pulang' | 'sekali-jalan'; // Untuk membedakan tiket
 }
 
 interface BookingHistoryProps {
@@ -112,6 +113,30 @@ export default function BookingHistory({ isOpen, onClose }: BookingHistoryProps)
         }
     };
 
+    const getTripTypeBadgeColor = (tripType?: string) => {
+        switch (tripType) {
+            case 'berangkat':
+                return 'bg-blue-100 text-blue-800 border-blue-300';
+            case 'pulang':
+                return 'bg-orange-100 text-orange-800 border-orange-300';
+            case 'sekali-jalan':
+            default:
+                return 'bg-gray-100 text-gray-800 border-gray-300';
+        }
+    };
+
+    const getTripTypeLabel = (tripType?: string) => {
+        switch (tripType) {
+            case 'berangkat':
+                return '🔵 Berangkat';
+            case 'pulang':
+                return '🟠 Pulang';
+            case 'sekali-jalan':
+            default:
+                return 'Sekali Jalan';
+        }
+    };
+
     const generateQRCodeURL = (bookingCode: string) => {
         return `http://localhost:3000/booking-code/${bookingCode}`;
     };
@@ -168,21 +193,47 @@ export default function BookingHistory({ isOpen, onClose }: BookingHistoryProps)
                         <div className="h-[60vh] overflow-y-auto">
                             <div className="space-y-4 p-6">
                                 {bookingHistory.map((booking) => (
-                                    <Card key={booking.id} className="border border-gray-200 hover:shadow-md transition-shadow">
+                                    <Card 
+                                        key={booking.id} 
+                                        className={`border-2 hover:shadow-md transition-shadow ${
+                                            booking.tripType === 'berangkat' 
+                                                ? 'border-blue-200 bg-blue-50/30' 
+                                                : booking.tripType === 'pulang'
+                                                ? 'border-orange-200 bg-orange-50/30'
+                                                : 'border-gray-200'
+                                        }`}
+                                    >
                                         <CardContent className="p-4">
                                             <div className="flex justify-between items-start mb-3">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                                        <Train className="w-6 h-6 text-blue-600" />
+                                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                                                        booking.tripType === 'berangkat'
+                                                            ? 'bg-blue-100'
+                                                            : booking.tripType === 'pulang'
+                                                            ? 'bg-orange-100'
+                                                            : 'bg-gray-100'
+                                                    }`}>
+                                                        <Train className={`w-6 h-6 ${
+                                                            booking.tripType === 'berangkat'
+                                                                ? 'text-blue-600'
+                                                                : booking.tripType === 'pulang'
+                                                                ? 'text-orange-600'
+                                                                : 'text-gray-600'
+                                                        }`} />
                                                     </div>
                                                     <div>
                                                         <h3 className="font-bold text-lg text-gray-800">
                                                             {booking.trainName}
                                                         </h3>
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-2 flex-wrap">
                                                             <Badge className={getClassBadgeColor(booking.class)}>
                                                                 {booking.class}
                                                             </Badge>
+                                                            {booking.tripType && (
+                                                                <Badge className={getTripTypeBadgeColor(booking.tripType)}>
+                                                                    {getTripTypeLabel(booking.tripType)}
+                                                                </Badge>
+                                                            )}
                                                             <span className="text-sm text-gray-600">
                                                                 {booking.trainNumber}
                                                             </span>

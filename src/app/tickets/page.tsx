@@ -746,9 +746,32 @@ function TicketPageContent() {
                                                     isPulangPergi: ticketSearchParams.isPulangPergi
                                                 };
 
-                                                // Jika PP, redirect ke halaman pilih tiket pulang
-                                                if (ticketSearchParams.isPulangPergi) {
-                                                    // Save departure ticket to localStorage
+                                                // Jika ini return trip page, kirim kedua tiket ke orders
+                                                if (isReturnTrip && departureTicket) {
+                                                    // Create return ticket data
+                                                    const returnTicketData = {
+                                                        ...ticketData,
+                                                        isPulangPergi: false // Set false untuk return ticket individual
+                                                    };
+                                                    
+                                                    // Gabungkan kedua tiket untuk dikirim ke orders
+                                                    const combinedData = {
+                                                        departureTicket: departureTicket,
+                                                        returnTicket: returnTicketData,
+                                                        isPulangPergi: true
+                                                    };
+                                                    
+                                                    // Clean up localStorage
+                                                    localStorage.removeItem('departureTicket');
+                                                    
+                                                    // Navigate to orders with both tickets
+                                                    const queryString = new URLSearchParams({
+                                                        ticketData: JSON.stringify(combinedData)
+                                                    }).toString();
+                                                    
+                                                    router.push(`/orders?${queryString}`);
+                                                } else if (ticketSearchParams.isPulangPergi) {
+                                                    // Jika PP (departure trip), save dan redirect ke halaman pilih tiket pulang
                                                     localStorage.setItem('departureTicket', JSON.stringify(ticketData));
                                                     
                                                     // Redirect to return ticket selection page
@@ -776,7 +799,7 @@ function TicketPageContent() {
                                             className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 group"
                                         >
                                             <span className="hidden sm:inline">
-                                                {ticketSearchParams.isPulangPergi ? 'Pilih Tiket Berangkat' : 'Pesan Sekarang'}
+                                                {isReturnTrip ? 'Pilih Tiket Pulang' : ticketSearchParams.isPulangPergi ? 'Pilih Tiket Berangkat' : 'Pesan Sekarang'}
                                             </span>
                                             <span className="sm:hidden">Pesan</span>
                                             <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2 group-hover:translate-x-1 transition-transform inline-block" />

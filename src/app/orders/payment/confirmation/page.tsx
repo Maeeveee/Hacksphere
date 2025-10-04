@@ -51,6 +51,8 @@ interface TicketData {
 
 interface OrderData {
   ticketData: TicketData;
+  returnTicketData?: TicketData;
+  isPulangPergi: boolean;
   bookingData: BookingFormData;
   passengersData: PassengerData[];
   useBookingDataForPassenger: boolean;
@@ -319,15 +321,18 @@ function PaymentConfirmationContent() {
                 nama: p.nama,
                 nomorIdentitas: p.nomorIdentitas,
                 disabilitas: paymentData.orderData.ticketData.isDifabel || false, // Ambil dari ticketData
-                selectedSeat: p.selectedSeat
+                selectedSeat: p.selectedSeat,
+                selectedSeatReturn: p.selectedSeatReturn // Add return seat
             }));
             
-            // Siapkan request untuk save booking
+            // Siapkan request untuk save booking - DEPARTURE TICKET
             const saveRequest: SaveBookingRequest = {
                 bookingCode: paymentData.bookingCode,
                 paymentCode: paymentData.paymentCode,
                 paymentDeadline: deadlineString,
-                totalPrice: paymentData.orderData.ticketData.totalPrice,
+                totalPrice: paymentData.orderData.isPulangPergi && paymentData.orderData.returnTicketData
+                    ? paymentData.orderData.ticketData.totalPrice + paymentData.orderData.returnTicketData.totalPrice
+                    : paymentData.orderData.ticketData.totalPrice,
                 paymentStatus: paymentData.paymentStatus || 'menunggu_pembayaran',
                 
                 trainName: paymentData.orderData.ticketData.trainName,
@@ -340,29 +345,116 @@ function PaymentConfirmationContent() {
                 qrCodeData: qrCodeData
             };
             
-            // Simpan ke database
+            // Simpan tiket berangkat ke database
+            console.log('💾 Saving departure ticket to database...');
             const result = await saveBookingLengkap(saveRequest);
             
-            if (result.success) {
-                console.log('✅ Booking berhasil disimpan ke database!', result.pemesananId);
-                
-                // Tetap simpan ke localStorage juga sebagai backup
-                const existingTickets = localStorage.getItem('ticketHistory');
-                const ticketHistory = existingTickets ? JSON.parse(existingTickets) : [];
-                
-                ticketHistory.push({
-                    bookingCode: paymentData.bookingCode,
-                    createdAt: new Date().toISOString(),
-                    orderData: paymentData.orderData
-                });
-                
-                localStorage.setItem('ticketHistory', JSON.stringify(ticketHistory));
-                
-                return true;
-            } else {
-                console.error('❌ Gagal menyimpan ke database:', result.error);
+            if (!result.success) {
+                console.error('❌ Gagal menyimpan tiket berangkat ke database:', result.error);
                 return false;
             }
+            
+            console.log('✅ Tiket berangkat berhasil disimpan ke database!', result.pemesananId);
+            
+            // Simpan tiket pulang jika PP
+            if (paymentData.orderData.isPulangPergi && paymentData.orderData.returnTicketData) {
+                console.log('💾 Saving return ticket to database...');
+                
+                // Generate booking code untuk tiket pulang (dengan suffix -R)
+                const returnBookingCode = `${paymentData.bookingCode}-R`;
+                
+                // Siapkan QR Code data untuk tiket pulang
+                const returnQrCodeData: TiketQRData = {
+                    booking_code: returnBookingCode,
+                    payment_code: paymentData.paymentCode,
+                    payment_deadline: deadlineString,
+                    
+                    train_name: paymentData.orderData.returnTicketData.trainName,
+                    train_number: paymentData.orderData.returnTicketData.trainNumber,
+                    train_class: paymentData.orderData.returnTicketData.class,
+                    
+                    origin: paymentData.orderData.returnTicketData.origin,
+                    destination: paymentData.orderData.returnTicketData.destination,
+                    departure_date: paymentData.orderData.returnTicketData.departureDate,
+                    departure_time: paymentData.orderData.returnTicketData.departureTime,
+                    arrival_time: paymentData.orderData.returnTicketData.arrivalTime,
+                    duration: paymentData.orderData.returnTicketData.duration,
+                    
+                    booker_name: paymentData.orderData.bookingData.nama,
+                    booker_gender: paymentData.orderData.bookingData.gender,
+                    booker_identity_type: paymentData.orderData.bookingData.tipeIdentitas,
+                    booker_identity_number: paymentData.orderData.bookingData.nomorIdentitas,
+                    booker_phone: paymentData.orderData.bookingData.noHP,
+                    booker_email: paymentData.orderData.bookingData.email,
+                    booker_address: paymentData.orderData.bookingData.alamat || '',
+                    
+                    passengers_data: paymentData.orderData.passengersData.map((p: any) => ({
+                        ...p,
+                        selectedSeat: p.selectedSeatReturn // Use return seat for return ticket
+                    })),
+                    passenger_count: paymentData.orderData.returnTicketData.passengers,
+                    adult_count: paymentData.orderData.returnTicketData.adults,
+                    child_count: paymentData.orderData.returnTicketData.children,
+                    
+                    price_per_ticket: paymentData.orderData.returnTicketData.price,
+                    total_price: paymentData.orderData.returnTicketData.totalPrice,
+                    
+                    payment_status: paymentData.paymentStatus || 'menunggu_pembayaran',
+                    qr_code_url: `http://localhost:3000/booking-code/${returnBookingCode}`,
+                    
+                    facilities: paymentData.orderData.returnTicketData.facilities,
+                    payment_method: paymentData.paymentMethod,
+                    payment_bank: paymentData.bankName
+                };
+                
+                // Passengers dengan seat pulang
+                const passengersReturnForDB = paymentData.orderData.passengersData.map((p: any) => ({
+                    nama: p.nama,
+                    nomorIdentitas: p.nomorIdentitas,
+                    disabilitas: paymentData.orderData.returnTicketData!.isDifabel || false,
+                    selectedSeat: p.selectedSeatReturn // Use return seat
+                }));
+                
+                const returnSaveRequest: SaveBookingRequest = {
+                    bookingCode: returnBookingCode,
+                    paymentCode: paymentData.paymentCode,
+                    paymentDeadline: deadlineString,
+                    totalPrice: paymentData.orderData.returnTicketData.totalPrice,
+                    paymentStatus: paymentData.paymentStatus || 'menunggu_pembayaran',
+                    
+                    trainName: paymentData.orderData.returnTicketData.trainName,
+                    origin: paymentData.orderData.returnTicketData.origin,
+                    destination: paymentData.orderData.returnTicketData.destination,
+                    departureDate: paymentData.orderData.returnTicketData.departureDate,
+                    departureTime: paymentData.orderData.returnTicketData.departureTime,
+                    
+                    passengers: passengersReturnForDB,
+                    qrCodeData: returnQrCodeData
+                };
+                
+                const returnResult = await saveBookingLengkap(returnSaveRequest);
+                
+                if (!returnResult.success) {
+                    console.error('❌ Gagal menyimpan tiket pulang ke database:', returnResult.error);
+                    // Don't return false here, departure ticket is already saved
+                } else {
+                    console.log('✅ Tiket pulang berhasil disimpan ke database!', returnResult.pemesananId);
+                }
+            }
+            
+            // Simpan ke localStorage juga sebagai backup
+            const existingTickets = localStorage.getItem('ticketHistory');
+            const ticketHistory = existingTickets ? JSON.parse(existingTickets) : [];
+            
+            ticketHistory.push({
+                bookingCode: paymentData.bookingCode,
+                createdAt: new Date().toISOString(),
+                orderData: paymentData.orderData
+            });
+            
+            localStorage.setItem('ticketHistory', JSON.stringify(ticketHistory));
+            
+            return true;
             
         } catch (error) {
             console.error('❌ Error in saveTicketToDatabase:', error);
@@ -417,7 +509,11 @@ function PaymentConfirmationContent() {
             localStorage.setItem('paymentData', JSON.stringify(completedPayment));
             
             // Save to booking history
-            const bookingHistoryItem = {
+            // Untuk PP, simpan 2 item terpisah (berangkat dan pulang)
+            const bookingItems = [];
+            
+            // Item untuk tiket berangkat
+            const departureHistoryItem = {
                 id: Date.now().toString(),
                 bookingCode: paymentData.bookingCode || bookingCode,
                 trainName: paymentData.orderData.ticketData.trainName,
@@ -434,8 +530,37 @@ function PaymentConfirmationContent() {
                 paymentMethod: paymentData.paymentMethod,
                 bankName: paymentData.bankName,
                 completedAt: new Date().toISOString(),
-                status: 'completed'
+                status: 'completed',
+                tripType: paymentData.orderData.isPulangPergi ? 'berangkat' : 'sekali-jalan'
             };
+            
+            bookingItems.push(departureHistoryItem);
+            
+            // Item untuk tiket pulang (jika PP)
+            if (paymentData.orderData.isPulangPergi && paymentData.orderData.returnTicketData) {
+                const returnHistoryItem = {
+                    id: `${Date.now()}-return`,
+                    bookingCode: `${paymentData.bookingCode || bookingCode}-R`,
+                    trainName: paymentData.orderData.returnTicketData.trainName,
+                    trainNumber: paymentData.orderData.returnTicketData.trainNumber,
+                    origin: paymentData.orderData.returnTicketData.origin,
+                    destination: paymentData.orderData.returnTicketData.destination,
+                    departureDate: paymentData.orderData.returnTicketData.departureDate,
+                    departureTime: paymentData.orderData.returnTicketData.departureTime,
+                    arrivalTime: paymentData.orderData.returnTicketData.arrivalTime,
+                    passengerName: paymentData.orderData.passengersData[0]?.nama || paymentData.orderData.bookingData.nama,
+                    totalPrice: paymentData.orderData.returnTicketData.totalPrice,
+                    passengers: paymentData.orderData.returnTicketData.passengers,
+                    class: paymentData.orderData.returnTicketData.class,
+                    paymentMethod: paymentData.paymentMethod,
+                    bankName: paymentData.bankName,
+                    completedAt: new Date().toISOString(),
+                    status: 'completed',
+                    tripType: 'pulang'
+                };
+                
+                bookingItems.push(returnHistoryItem);
+            }
             
             // Get existing booking history
             const existingHistory = localStorage.getItem('bookingHistory');
@@ -450,8 +575,10 @@ function PaymentConfirmationContent() {
                 }
             }
             
-            // Add new booking to history
-            bookingHistory.unshift(bookingHistoryItem); // Add to beginning of array
+            // Add new bookings to history (tiket pulang dulu, baru tiket berangkat agar urutan benar)
+            bookingItems.reverse().forEach(item => {
+                bookingHistory.unshift(item);
+            });
             
             // Keep only last 50 bookings to prevent localStorage from getting too large
             if (bookingHistory.length > 50) {
@@ -502,9 +629,17 @@ function PaymentConfirmationContent() {
 
     const ticketData = convertToTicketFormat(paymentData.orderData, paymentData.bookingCode || bookingCode);
 
+    // Generate return ticket data jika PP
+    const returnTicketData = paymentData?.orderData.isPulangPergi && paymentData?.orderData.returnTicketData
+        ? convertToTicketFormat({
+            ...paymentData.orderData,
+            ticketData: paymentData.orderData.returnTicketData
+          }, `${paymentData.bookingCode || bookingCode}-R`)
+        : null;
+
     return (
         <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 min-h-screen p-4 md:p-8">
-            <div className="max-w-2xl mx-auto">
+            <div className={`mx-auto ${paymentData?.orderData.isPulangPergi && isPaid ? 'max-w-6xl' : 'max-w-2xl'}`}>
                 <Button 
                     variant="outline" 
                     onClick={handleBackClick}
@@ -515,7 +650,51 @@ function PaymentConfirmationContent() {
                 </Button>
                 
                 {isPaid ? (
-                    <TicketDisplay ticket={ticketData} />
+                    <div className="space-y-6">
+                        {/* Grid Layout untuk Tiket - Bersebelahan di layar besar */}
+                        <div className={`grid gap-6 ${paymentData?.orderData.isPulangPergi && returnTicketData ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+                            {/* Tiket Berangkat */}
+                            <div className="flex flex-col">
+                                <div className="text-center mb-3">
+                                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                                        <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                                        TIKET BERANGKAT
+                                    </span>
+                                </div>
+                                <TicketDisplay ticket={ticketData} variant="departure" />
+                            </div>
+
+                            {/* Tiket Pulang - jika PP */}
+                            {paymentData?.orderData.isPulangPergi && returnTicketData && (
+                                <div className="flex flex-col">
+                                    <div className="text-center mb-3">
+                                        <span className="inline-flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-800 rounded-full text-sm font-semibold">
+                                            <div className="w-2 h-2 bg-orange-600 rounded-full"></div>
+                                            TIKET PULANG
+                                        </span>
+                                    </div>
+                                    <TicketDisplay ticket={returnTicketData} variant="return" />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Tombol Aksi */}
+                        <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                            <Button 
+                                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                                onClick={() => router.push(`/booking-code/${paymentData.bookingCode || bookingCode}`)}
+                            >
+                                Lihat Detail & Cetak Tiket
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                className="flex-1"
+                                onClick={() => router.push('/')}
+                            >
+                                Kembali ke Beranda
+                            </Button>
+                        </div>
+                    </div>
                 ) : (
                     <div className="space-y-4">
                         {paymentData.bankName && (
@@ -541,7 +720,12 @@ function PaymentConfirmationContent() {
                                         <CheckCircle2 className="h-10 w-10 text-green-500" />
                                     </div>
                                     <h2 className="text-xl font-semibold text-gray-800 mb-2">Pembayaran Berhasil</h2>
-                                    <p className="text-gray-600 mb-4">Tiket Anda telah dikonfirmasi dan siap ditampilkan.</p>
+                                    <p className="text-gray-600 mb-4">
+                                        {paymentData?.orderData.isPulangPergi 
+                                            ? 'Tiket berangkat dan pulang Anda telah dikonfirmasi dan siap ditampilkan.'
+                                            : 'Tiket Anda telah dikonfirmasi dan siap ditampilkan.'
+                                        }
+                                    </p>
                                     <div className="flex flex-col sm:flex-row gap-2">
                                         <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => { setShowSuccessModal(false); setIsPaid(true); }}>
                                             Lihat Tiket
@@ -551,9 +735,35 @@ function PaymentConfirmationContent() {
                                 </div>
                                 {paymentData && (
                                     <div className="bg-gray-50 px-6 py-4 text-sm text-left grid gap-1">
-                                        <div className="flex justify-between"><span className="text-gray-500">Kode Booking</span><span className="font-medium">{paymentData.bookingCode || bookingCode}</span></div>
-                                        <div className="flex justify-between"><span className="text-gray-500">Kereta</span><span className="font-medium truncate max-w-[170px] text-right">{paymentData.orderData.ticketData.trainName}</span></div>
-                                        <div className="flex justify-between"><span className="text-gray-500">Rute</span><span className="font-medium">{paymentData.orderData.ticketData.origin} → {paymentData.orderData.ticketData.destination}</span></div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Kode Booking</span>
+                                            <span className="font-medium">{paymentData.bookingCode || bookingCode}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Tipe Tiket</span>
+                                            <span className="font-medium">{paymentData.orderData.isPulangPergi ? 'Pulang-Pergi' : 'Sekali Jalan'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Kereta Berangkat</span>
+                                            <span className="font-medium truncate max-w-[170px] text-right">{paymentData.orderData.ticketData.trainName}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Rute Berangkat</span>
+                                            <span className="font-medium text-right">{paymentData.orderData.ticketData.origin} → {paymentData.orderData.ticketData.destination}</span>
+                                        </div>
+                                        {paymentData.orderData.isPulangPergi && paymentData.orderData.returnTicketData && (
+                                            <>
+                                                <div className="border-t border-gray-300 my-2"></div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Kereta Pulang</span>
+                                                    <span className="font-medium truncate max-w-[170px] text-right">{paymentData.orderData.returnTicketData.trainName}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Rute Pulang</span>
+                                                    <span className="font-medium text-right">{paymentData.orderData.returnTicketData.origin} → {paymentData.orderData.returnTicketData.destination}</span>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>

@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Clock, MapPin, Train, Users, CreditCard, Wifi, Utensils, Zap, Bed, Star, CheckCircle, AlertTriangle, Edit3, MapPin as Location } from "lucide-react";
 import UserMenu from "@/components/UserMenu";
 import { getOccupiedSeats } from "@/lib/supabase/queries";
+import { randomizeAdjacentSeats, type SeatConfig } from "@/lib/seatUtils";
 
 interface BookingFormData {
   gender: string;
@@ -29,7 +30,8 @@ interface PassengerData {
   tipeIdentitas: string;
   nomorIdentitas: string;
   ageCategory: 'adult' | 'child';
-  selectedSeat?: SeatData;
+  selectedSeat?: SeatConfig;
+  selectedSeatReturn?: SeatConfig; // For return trip in PP bookings
 }
 
 interface SeatData {
@@ -64,6 +66,8 @@ interface TicketData {
 
 interface OrderData {
   ticketData: TicketData;
+  returnTicketData?: TicketData;
+  isPulangPergi: boolean;
   bookingData: BookingFormData;
   passengersData: PassengerData[];
   useBookingDataForPassenger: boolean;
@@ -76,7 +80,9 @@ function SummaryContent() {
   const [showSeatModal, setShowSeatModal] = useState(false);
   const [currentPassengerIndex, setCurrentPassengerIndex] = useState<number>(-1);
   const [occupiedSeats, setOccupiedSeats] = useState<string[]>([]);
+  const [occupiedSeatsReturn, setOccupiedSeatsReturn] = useState<string[]>([]);
   const [isLoadingSeats, setIsLoadingSeats] = useState(false);
+  const [isReturnTrip, setIsReturnTrip] = useState(false); // Track which trip's seat is being selected
 
   // Load order data from localStorage
   useEffect(() => {
@@ -102,6 +108,7 @@ function SummaryContent() {
       
       setIsLoadingSeats(true);
       try {
+        // Fetch occupied seats for departure ticket
         const { data, error } = await getOccupiedSeats(
           orderData.ticketData.trainName,
           orderData.ticketData.class,
@@ -111,15 +118,33 @@ function SummaryContent() {
 
         if (error) {
           console.error('Error fetching occupied seats:', error);
-          // Fallback to empty array if error
           setOccupiedSeats([]);
         } else {
           setOccupiedSeats(data || []);
-          console.log('📍 Loaded occupied seats from database:', data);
+          console.log('📍 Loaded occupied seats from database (Departure):', data);
+        }
+
+        // Fetch occupied seats for return ticket if PP
+        if (orderData.isPulangPergi && orderData.returnTicketData) {
+          const { data: returnData, error: returnError } = await getOccupiedSeats(
+            orderData.returnTicketData.trainName,
+            orderData.returnTicketData.class,
+            orderData.returnTicketData.departureDate,
+            orderData.returnTicketData.departureTime
+          );
+
+          if (returnError) {
+            console.error('Error fetching return occupied seats:', returnError);
+            setOccupiedSeatsReturn([]);
+          } else {
+            setOccupiedSeatsReturn(returnData || []);
+            console.log('📍 Loaded occupied seats from database (Return):', returnData);
+          }
         }
       } catch (err) {
         console.error('Exception fetching occupied seats:', err);
         setOccupiedSeats([]);
+        setOccupiedSeatsReturn([]);
       } finally {
         setIsLoadingSeats(false);
       }
@@ -128,29 +153,137 @@ function SummaryContent() {
     fetchOccupiedSeats();
   }, [orderData]);
 
+  // Auto-assign seats for passengers who don't have seats yet
+  useEffect(() => {
+    const autoAssignSeats = async () => {
+      if (!orderData || isLoadingSeats) return;
+
+      let needsUpdate = false;
+      const updatedPassengers = [...orderData.passengersData];
+
+      // Auto-assign DEPARTURE seats for passengers without selectedSeat
+      const passengersNeedingDepartureSeats = updatedPassengers.filter(
+        p => !p.selectedSeat || !p.selectedSeat.seatNumber
+      );
+
+      if (passengersNeedingDepartureSeats.length > 0 && occupiedSeats.length > 0) {
+        console.log(`🎲 Auto-assigning ${passengersNeedingDepartureSeats.length} departure seats...`);
+        
+        // Combine occupied seats from database + seats already selected in this session
+        const sessionOccupiedSeats = updatedPassengers
+          .filter(p => p.selectedSeat && p.selectedSeat.seatNumber)
+          .map(p => p.selectedSeat!.seatNumber);
+
+        const allOccupiedSeats = [...new Set([...occupiedSeats, ...sessionOccupiedSeats])];
+        
+        console.log('🪑 Occupied departure seats:', allOccupiedSeats);
+        
+        // Generate random adjacent seats
+        const randomSeats = randomizeAdjacentSeats(
+          orderData.ticketData.class,
+          allOccupiedSeats,
+          passengersNeedingDepartureSeats.length
+        );
+
+        if (randomSeats.length >= passengersNeedingDepartureSeats.length) {
+          let seatIndex = 0;
+          updatedPassengers.forEach(passenger => {
+            if (!passenger.selectedSeat || !passenger.selectedSeat.seatNumber) {
+              passenger.selectedSeat = randomSeats[seatIndex];
+              console.log(`✅ Assigned departure seat ${randomSeats[seatIndex].seatNumber} to ${passenger.nama}`);
+              seatIndex++;
+              needsUpdate = true;
+            }
+          });
+        }
+      }
+
+      // Auto-assign RETURN seats for PP bookings
+      if (orderData.isPulangPergi && orderData.returnTicketData) {
+        const passengersNeedingReturnSeats = updatedPassengers.filter(
+          p => !p.selectedSeatReturn || !p.selectedSeatReturn.seatNumber
+        );
+
+        if (passengersNeedingReturnSeats.length > 0 && occupiedSeatsReturn.length > 0) {
+          console.log(`🎲 Auto-assigning ${passengersNeedingReturnSeats.length} return seats...`);
+          
+          // Combine occupied seats from database + seats already selected in this session
+          const sessionOccupiedSeatsReturn = updatedPassengers
+            .filter(p => p.selectedSeatReturn && p.selectedSeatReturn.seatNumber)
+            .map(p => p.selectedSeatReturn!.seatNumber);
+
+          const allOccupiedSeatsReturn = [...new Set([...occupiedSeatsReturn, ...sessionOccupiedSeatsReturn])];
+          
+          console.log('🪑 Occupied return seats:', allOccupiedSeatsReturn);
+          
+          // Generate random adjacent seats for return trip
+          const randomSeatsReturn = randomizeAdjacentSeats(
+            orderData.returnTicketData.class,
+            allOccupiedSeatsReturn,
+            passengersNeedingReturnSeats.length
+          );
+
+          if (randomSeatsReturn.length >= passengersNeedingReturnSeats.length) {
+            let seatIndex = 0;
+            updatedPassengers.forEach(passenger => {
+              if (!passenger.selectedSeatReturn || !passenger.selectedSeatReturn.seatNumber) {
+                passenger.selectedSeatReturn = randomSeatsReturn[seatIndex];
+                console.log(`✅ Assigned return seat ${randomSeatsReturn[seatIndex].seatNumber} to ${passenger.nama}`);
+                seatIndex++;
+                needsUpdate = true;
+              }
+            });
+          }
+        }
+      }
+
+      // Update state and localStorage if changes were made
+      if (needsUpdate) {
+        const updatedOrderData = {
+          ...orderData,
+          passengersData: updatedPassengers
+        };
+        setOrderData(updatedOrderData);
+        localStorage.setItem('orderData', JSON.stringify(updatedOrderData));
+        
+        console.log('🎫 All passengers now have seats assigned');
+      }
+    };
+
+    autoAssignSeats();
+  }, [orderData, occupiedSeats, occupiedSeatsReturn, isLoadingSeats]);
+
   // Seat selection functions
-  const handleSeatSelection = async (passengerIndex: number) => {
+  const handleSeatSelection = async (passengerIndex: number, forReturnTrip: boolean = false) => {
     setCurrentPassengerIndex(passengerIndex);
+    setIsReturnTrip(forReturnTrip);
     setShowSeatModal(true);
     
     // Refresh occupied seats data saat modal dibuka
-    // Ini memastikan data kursi selalu up-to-date dari database
     if (orderData?.ticketData) {
       setIsLoadingSeats(true);
       try {
-        console.log('🔄 Refreshing seat data from database...');
+        const ticketToUse = forReturnTrip && orderData.returnTicketData 
+          ? orderData.returnTicketData 
+          : orderData.ticketData;
+
+        console.log(`🔄 Refreshing seat data from database for ${forReturnTrip ? 'Return' : 'Departure'} trip...`);
         const { data, error } = await getOccupiedSeats(
-          orderData.ticketData.trainName,
-          orderData.ticketData.class,
-          orderData.ticketData.departureDate,
-          orderData.ticketData.departureTime
+          ticketToUse.trainName,
+          ticketToUse.class,
+          ticketToUse.departureDate,
+          ticketToUse.departureTime
         );
 
         if (error) {
           console.error('❌ Error refreshing occupied seats:', error);
         } else {
-          setOccupiedSeats(data || []);
-          console.log('✅ Seat data refreshed. Occupied seats:', data);
+          if (forReturnTrip) {
+            setOccupiedSeatsReturn(data || []);
+          } else {
+            setOccupiedSeats(data || []);
+          }
+          console.log(`✅ Seat data refreshed for ${forReturnTrip ? 'Return' : 'Departure'}. Occupied seats:`, data);
         }
       } catch (err) {
         console.error('❌ Exception refreshing occupied seats:', err);
@@ -163,6 +296,11 @@ function SummaryContent() {
   const generateSeatMap = () => {
     if (!orderData?.ticketData) return [];
     
+    // Use the correct ticket data based on which trip's seat is being selected
+    const ticketToUse = isReturnTrip && orderData.returnTicketData 
+      ? orderData.returnTicketData 
+      : orderData.ticketData;
+    
     // Different configurations based on train class
     const classConfig = {
       'eksekutif': { rows: 15, seatsPerRow: 4, wagon: 'EKS-A', spacing: 'luxury' },
@@ -170,22 +308,35 @@ function SummaryContent() {
       'ekonomi': { rows: 20, seatsPerRow: 4, wagon: 'EKO-A', spacing: 'standard' }
     };
     
-    const config = classConfig[orderData.ticketData.class?.toLowerCase() as keyof typeof classConfig] || classConfig.ekonomi;
+    const config = classConfig[ticketToUse.class?.toLowerCase() as keyof typeof classConfig] || classConfig.ekonomi;
     const columns = ['A', 'B', 'C', 'D'];
     const seats: SeatData[][] = [];
 
-    // Gunakan data dari database (occupiedSeats state)
-    // Data ini sudah di-fetch dari database melalui getOccupiedSeats()
-    console.log('🪑 Generating seat map with occupied seats from DB:', occupiedSeats);
+    // Use correct occupied seats based on trip type
+    const currentOccupiedSeats = isReturnTrip ? occupiedSeatsReturn : occupiedSeats;
+    console.log(`🪑 Generating seat map for ${isReturnTrip ? 'Return' : 'Departure'} trip with occupied seats from DB:`, currentOccupiedSeats);
 
     for (let row = 1; row <= config.rows; row++) {
       const rowSeats: SeatData[] = [];
       for (let col = 0; col < config.seatsPerRow; col++) {
         const column = columns[col];
         const seatNumber = `${row}${column}`;
-        // Cek apakah kursi ini ada di database occupied seats ATAU sudah dipilih penumpang lain di session ini
-        const isOccupied = occupiedSeats.includes(seatNumber) ||
-                          orderData.passengersData.some(p => p.selectedSeat?.seatNumber === seatNumber);
+        
+        // Check if seat is occupied in database OR selected by passengers in current session
+        let isOccupied = currentOccupiedSeats.includes(seatNumber);
+        
+        // Also check if seat is selected by other passengers in this session
+        if (isReturnTrip) {
+          // For return trip, check selectedSeatReturn
+          isOccupied = isOccupied || orderData.passengersData.some(p => 
+            p.selectedSeatReturn?.seatNumber === seatNumber
+          );
+        } else {
+          // For departure trip, check selectedSeat
+          isOccupied = isOccupied || orderData.passengersData.some(p => 
+            p.selectedSeat?.seatNumber === seatNumber
+          );
+        }
         
         rowSeats.push({
           wagon: config.wagon,
@@ -203,11 +354,31 @@ function SummaryContent() {
   const handleSeatSelect = (seat: SeatData) => {
     if (seat.isOccupied || currentPassengerIndex === -1 || !orderData) return;
 
-    const updatedPassengers = [...orderData.passengersData];
-    updatedPassengers[currentPassengerIndex] = {
-      ...updatedPassengers[currentPassengerIndex],
-      selectedSeat: seat
+    // Convert SeatData to SeatConfig format
+    const seatConfig: SeatConfig = {
+      wagon: seat.wagon,
+      row: seat.row,
+      column: seat.column,
+      seatNumber: seat.seatNumber,
+      isOccupied: seat.isOccupied
     };
+
+    const updatedPassengers = [...orderData.passengersData];
+    
+    // Update the correct seat field based on trip type
+    if (isReturnTrip) {
+      updatedPassengers[currentPassengerIndex] = {
+        ...updatedPassengers[currentPassengerIndex],
+        selectedSeatReturn: seatConfig
+      };
+      console.log(`✅ Updated return seat for ${updatedPassengers[currentPassengerIndex].nama}: ${seatConfig.seatNumber}`);
+    } else {
+      updatedPassengers[currentPassengerIndex] = {
+        ...updatedPassengers[currentPassengerIndex],
+        selectedSeat: seatConfig
+      };
+      console.log(`✅ Updated departure seat for ${updatedPassengers[currentPassengerIndex].nama}: ${seatConfig.seatNumber}`);
+    }
     
     const updatedOrderData = {
       ...orderData,
@@ -218,17 +389,29 @@ function SummaryContent() {
     localStorage.setItem('orderData', JSON.stringify(updatedOrderData));
     setShowSeatModal(false);
     setCurrentPassengerIndex(-1);
+    setIsReturnTrip(false);
   };
 
   const handleProceedToPayment = () => {
     if (!orderData) return;
 
-    // Validate all passengers have selected seats
+    // Validate all passengers have selected seats for departure trip
     for (let i = 0; i < orderData.passengersData.length; i++) {
       const passenger = orderData.passengersData[i];
       if (!passenger.selectedSeat) {
-        alert(`Mohon pilih kursi untuk penumpang ${i + 1}`);
+        alert(`Mohon pilih kursi berangkat untuk penumpang ${i + 1}`);
         return;
+      }
+    }
+
+    // If PP, validate all passengers have selected seats for return trip
+    if (orderData.isPulangPergi && orderData.returnTicketData) {
+      for (let i = 0; i < orderData.passengersData.length; i++) {
+        const passenger = orderData.passengersData[i];
+        if (!passenger.selectedSeatReturn) {
+          alert(`Mohon pilih kursi pulang untuk penumpang ${i + 1}`);
+          return;
+        }
       }
     }
 
@@ -335,7 +518,7 @@ function SummaryContent() {
           {/* Left Column - Summary Details */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Trip Information */}
+            {/* Trip Information - Tiket Berangkat */}
             <Card className="shadow-lg">
               <CardHeader className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
                 <CardTitle className="flex items-center gap-3">
@@ -343,7 +526,12 @@ function SummaryContent() {
                     <Train className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <div className="text-xl font-bold text-gray-800">Informasi Perjalanan</div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <div className="text-xl font-bold text-gray-800">
+                        {orderData.isPulangPergi ? 'Tiket Berangkat' : 'Informasi Perjalanan'}
+                      </div>
+                    </div>
                     <div className="text-sm text-gray-600">{ticketData.trainName} - {ticketData.trainNumber}</div>
                   </div>
                 </CardTitle>
@@ -393,6 +581,70 @@ function SummaryContent() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Trip Information - Tiket Pulang (Only for PP) */}
+            {orderData.isPulangPergi && orderData.returnTicketData && (
+              <Card className="shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-orange-50/50 to-amber-50/50">
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-orange-600 to-amber-600 rounded-full flex items-center justify-center">
+                      <Train className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        <div className="text-xl font-bold text-gray-800">Tiket Pulang</div>
+                      </div>
+                      <div className="text-sm text-gray-600">{orderData.returnTicketData.trainName} - {orderData.returnTicketData.trainNumber}</div>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Location className="w-5 h-5 text-green-600" />
+                        <div>
+                          <div className="text-sm text-gray-600">Stasiun Keberangkatan</div>
+                          <div className="font-semibold text-gray-800">{orderData.returnTicketData.origin}</div>
+                          <div className="text-sm text-gray-600">{orderData.returnTicketData.departureTime}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <MapPin className="w-5 h-5 text-red-600" />
+                        <div>
+                          <div className="text-sm text-gray-600">Stasiun Tujuan</div>
+                          <div className="font-semibold text-gray-800">{orderData.returnTicketData.destination}</div>
+                          <div className="text-sm text-gray-600">{orderData.returnTicketData.arrivalTime}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Tanggal Keberangkatan:</span>
+                        <span className="font-semibold">
+                          {new Date(orderData.returnTicketData.departureDate).toLocaleDateString('id-ID', { 
+                            day: 'numeric', 
+                            month: 'long',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Durasi Perjalanan:</span>
+                        <span className="font-semibold">{orderData.returnTicketData.duration}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">Kelas:</span>
+                        <Badge className={getClassBadgeColor(orderData.returnTicketData.class)}>
+                          {orderData.returnTicketData.class}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Booker Information */}
             <Card className="shadow-lg">
@@ -474,11 +726,16 @@ function SummaryContent() {
                         </div>
                       </div>
                       
-                      {/* Seat Selection */}
+                      {/* Seat Selection - Tiket Berangkat */}
                       <div className="border-t border-gray-100 pt-4">
+                        <div className="flex items-center gap-1 mb-2">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <h5 className="font-medium text-gray-800 text-sm">
+                            Kursi {orderData.isPulangPergi ? 'Berangkat' : ''}
+                          </h5>
+                        </div>
                         <div className="flex items-center justify-between">
                           <div>
-                            <h5 className="font-medium text-gray-800">Pilihan Kursi</h5>
                             <p className="text-sm text-gray-600">
                               {passenger.selectedSeat 
                                 ? `Kursi: ${passenger.selectedSeat.seatNumber} (${passenger.selectedSeat.wagon})`
@@ -494,7 +751,7 @@ function SummaryContent() {
                               </div>
                             )}
                             <Button
-                              onClick={() => handleSeatSelection(index)}
+                              onClick={() => handleSeatSelection(index, false)}
                               variant="outline"
                               className={`text-sm ${
                                 passenger.selectedSeat
@@ -503,7 +760,7 @@ function SummaryContent() {
                               }`}
                             >
                               <Edit3 className="w-3 h-3 mr-1" />
-                              {passenger.selectedSeat ? 'Ganti Kursi' : 'Pilih Kursi'}
+                              {passenger.selectedSeat ? 'Ganti' : 'Pilih'}
                             </Button>
                           </div>
                         </div>
@@ -514,6 +771,52 @@ function SummaryContent() {
                           </p>
                         )}
                       </div>
+
+                      {/* Seat Selection - Tiket Pulang (Only for PP) */}
+                      {orderData.isPulangPergi && orderData.returnTicketData && (
+                        <div className="border-t border-gray-100 pt-4 mt-4">
+                          <div className="flex items-center gap-1 mb-2">
+                            <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                            <h5 className="font-medium text-gray-800 text-sm">Kursi Pulang</h5>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-gray-600">
+                                {passenger.selectedSeatReturn 
+                                  ? `Kursi: ${passenger.selectedSeatReturn.seatNumber} (${passenger.selectedSeatReturn.wagon})`
+                                  : 'Belum memilih kursi'
+                                }
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              {passenger.selectedSeatReturn && (
+                                <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-lg text-sm">
+                                  <CheckCircle className="w-4 h-4" />
+                                  <span>{passenger.selectedSeatReturn.seatNumber}</span>
+                                </div>
+                              )}
+                              <Button
+                                onClick={() => handleSeatSelection(index, true)}
+                                variant="outline"
+                                className={`text-sm ${
+                                  passenger.selectedSeatReturn
+                                    ? 'border-orange-500 text-orange-600 hover:bg-orange-50'
+                                    : 'border-orange-500 text-orange-600 hover:bg-orange-50'
+                                }`}
+                              >
+                                <Edit3 className="w-3 h-3 mr-1" />
+                                {passenger.selectedSeatReturn ? 'Ganti' : 'Pilih'}
+                              </Button>
+                            </div>
+                          </div>
+                          {!passenger.selectedSeatReturn && (
+                            <p className="text-xs text-amber-600 mt-2 bg-amber-50 p-2 rounded">
+                              <AlertTriangle className="w-3 h-3 inline mr-1" />
+                              Wajib memilih kursi sebelum melanjutkan pembayaran
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -529,11 +832,22 @@ function SummaryContent() {
                   <CreditCard className="w-5 h-5"/>
                   <span className="text-lg font-semibold">Ringkasan Harga</span>
                 </div>
+                {orderData.isPulangPergi && (
+                  <div className="mt-2 bg-white/20 px-3 py-1 rounded-full inline-block">
+                    <span className="text-xs font-medium">Pulang-Pergi</span>
+                  </div>
+                )}
               </div>
               <div className="p-6">
                 <div className="space-y-4">
-                  {/* Price Breakdown */}
+                  {/* Price Breakdown - Tiket Berangkat */}
                   <div className="space-y-3">
+                    {orderData.isPulangPergi && (
+                      <div className="flex items-center gap-1 mb-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span className="text-xs font-bold text-blue-900">Tiket Berangkat</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-gray-600">Harga per tiket</span>
                       <span className="font-medium">{formatPrice(ticketData.price)}</span>
@@ -554,13 +868,55 @@ function SummaryContent() {
                         <span className="text-gray-500">{formatPrice(Math.floor(ticketData.price * 0.75) * ticketData.children)}</span>
                       </div>
                     )}
+                    <div className="flex justify-between text-sm pt-2 border-t">
+                      <span className="text-gray-700 font-medium">Subtotal Berangkat</span>
+                      <span className="font-semibold text-blue-600">{formatPrice(ticketData.totalPrice)}</span>
+                    </div>
                   </div>
+
+                  {/* Price Breakdown - Tiket Pulang (Only for PP) */}
+                  {orderData.isPulangPergi && orderData.returnTicketData && (
+                    <div className="space-y-3 border-t-2 border-dashed pt-4">
+                      <div className="flex items-center gap-1 mb-2">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        <span className="text-xs font-bold text-orange-900">Tiket Pulang</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Harga per tiket</span>
+                        <span className="font-medium">{formatPrice(orderData.returnTicketData.price)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Jumlah penumpang</span>
+                        <span className="font-medium">{orderData.returnTicketData.passengers}x</span>
+                      </div>
+                      {orderData.returnTicketData.children > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">- Dewasa ({orderData.returnTicketData.adults}x)</span>
+                          <span className="text-gray-500">{formatPrice(orderData.returnTicketData.price * orderData.returnTicketData.adults)}</span>
+                        </div>
+                      )}
+                      {orderData.returnTicketData.children > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">- Anak ({orderData.returnTicketData.children}x)</span>
+                          <span className="text-gray-500">{formatPrice(Math.floor(orderData.returnTicketData.price * 0.75) * orderData.returnTicketData.children)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-sm pt-2 border-t">
+                        <span className="text-gray-700 font-medium">Subtotal Pulang</span>
+                        <span className="font-semibold text-orange-600">{formatPrice(orderData.returnTicketData.totalPrice)}</span>
+                      </div>
+                    </div>
+                  )}
                   
-                  <div className="border-t pt-3">
+                  <div className="border-t-2 pt-3">
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-semibold text-gray-800">Total Harga</span>
                       <span className="text-xl font-bold text-blue-600">
-                        {formatPrice(ticketData.totalPrice)}
+                        {formatPrice(
+                          orderData.isPulangPergi && orderData.returnTicketData
+                            ? ticketData.totalPrice + orderData.returnTicketData.totalPrice
+                            : ticketData.totalPrice
+                        )}
                       </span>
                     </div>
                   </div>
@@ -584,16 +940,20 @@ function SummaryContent() {
                   <div className="border-t pt-4">
                     <Button 
                       onClick={handleProceedToPayment}
-                      disabled={passengersData.some(p => !p.selectedSeat)}
+                      disabled={
+                        passengersData.some(p => !p.selectedSeat) ||
+                        (orderData.isPulangPergi && passengersData.some(p => !p.selectedSeatReturn))
+                      }
                       className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 text-sm rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <CreditCard className="w-4 h-4 mr-2" />
                       Lanjut ke Pembayaran
                     </Button>
                     
-                    {passengersData.some(p => !p.selectedSeat) && (
+                    {(passengersData.some(p => !p.selectedSeat) || 
+                      (orderData.isPulangPergi && passengersData.some(p => !p.selectedSeatReturn))) && (
                       <p className="text-xs text-amber-600 text-center mt-2">
-                        Pilih kursi untuk semua penumpang terlebih dahulu
+                        Pilih kursi untuk semua penumpang{orderData.isPulangPergi ? ' (berangkat & pulang)' : ''} terlebih dahulu
                       </p>
                     )}
                     
@@ -612,11 +972,16 @@ function SummaryContent() {
       {showSeatModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
+            <div className={`bg-gradient-to-r ${isReturnTrip ? 'from-orange-600 to-amber-600' : 'from-blue-600 to-indigo-600'} text-white p-6`}>
               <div className="flex justify-between items-center">
                 <div>
                   <div className="flex items-center gap-3">
-                    <h3 className="text-xl font-bold">Pilih Kursi Penumpang</h3>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 ${isReturnTrip ? 'bg-orange-300' : 'bg-blue-300'} rounded-full`}></div>
+                      <h3 className="text-xl font-bold">
+                        Pilih Kursi {isReturnTrip ? 'Pulang' : 'Berangkat'}
+                      </h3>
+                    </div>
                     {isLoadingSeats && (
                       <div className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full text-xs">
                         <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -624,19 +989,19 @@ function SummaryContent() {
                       </div>
                     )}
                   </div>
-                  <p className="text-blue-100 text-sm">
+                  <p className={`${isReturnTrip ? 'text-orange-100' : 'text-blue-100'} text-sm`}>
                     {currentPassengerIndex >= 0 && passengersData[currentPassengerIndex]?.nama 
                       ? `Untuk: ${passengersData[currentPassengerIndex].nama}` 
                       : `Penumpang ${currentPassengerIndex + 1}`}
                   </p>
-                  {!isLoadingSeats && occupiedSeats.length > 0 && (
-                    <p className="text-blue-200 text-xs mt-1">
-                      📊 {occupiedSeats.length} kursi sudah terpesan dari database
+                  {!isLoadingSeats && (isReturnTrip ? occupiedSeatsReturn : occupiedSeats).length > 0 && (
+                    <p className={`${isReturnTrip ? 'text-orange-200' : 'text-blue-200'} text-xs mt-1`}>
+                      📊 {(isReturnTrip ? occupiedSeatsReturn : occupiedSeats).length} kursi sudah terpesan dari database
                     </p>
                   )}
                 </div>
                 <button 
-                  onClick={() => {setShowSeatModal(false); setCurrentPassengerIndex(-1);}}
+                  onClick={() => {setShowSeatModal(false); setCurrentPassengerIndex(-1); setIsReturnTrip(false);}}
                   className="text-white hover:text-gray-300 text-2xl font-bold"
                 >
                   ×
@@ -649,20 +1014,33 @@ function SummaryContent() {
               <div className="mb-6 bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-semibold text-gray-800">{ticketData?.trainName}</h4>
+                    <h4 className="font-semibold text-gray-800">
+                      {isReturnTrip && orderData.returnTicketData 
+                        ? orderData.returnTicketData.trainName 
+                        : ticketData?.trainName}
+                    </h4>
                     <p className="text-sm text-gray-600">
                       Gerbong: {(() => {
+                        const currentTicket = isReturnTrip && orderData.returnTicketData 
+                          ? orderData.returnTicketData 
+                          : ticketData;
                         const classConfig = {
                           'eksekutif': 'EKS-A',
                           'bisnis': 'BIS-A', 
                           'ekonomi': 'EKO-A'
                         };
-                        return classConfig[ticketData?.class?.toLowerCase() as keyof typeof classConfig] || 'EKO-A';
+                        return classConfig[currentTicket?.class?.toLowerCase() as keyof typeof classConfig] || 'EKO-A';
                       })()}
                     </p>
                   </div>
-                  <Badge className={getClassBadgeColor(ticketData?.class || '')}>
-                    {ticketData?.class}
+                  <Badge className={getClassBadgeColor(
+                    isReturnTrip && orderData.returnTicketData 
+                      ? orderData.returnTicketData.class 
+                      : ticketData?.class || ''
+                  )}>
+                    {isReturnTrip && orderData.returnTicketData 
+                      ? orderData.returnTicketData.class 
+                      : ticketData?.class}
                   </Badge>
                 </div>
               </div>

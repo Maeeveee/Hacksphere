@@ -57,6 +57,12 @@ interface TicketData {
   isPulangPergi: boolean;
 }
 
+interface CombinedTicketData {
+  departureTicket: TicketData;
+  returnTicket?: TicketData;
+  isPulangPergi: boolean;
+}
+
 
 
 function OrderFormContent() {
@@ -64,6 +70,8 @@ function OrderFormContent() {
   const searchParams = useSearchParams();
   
   const [ticketData, setTicketData] = useState<TicketData | null>(null);
+  const [returnTicketData, setReturnTicketData] = useState<TicketData | null>(null);
+  const [isPulangPergi, setIsPulangPergi] = useState(false);
   const [bookingData, setBookingData] = useState<BookingFormData>({
     gender: "",
     nama: "",
@@ -112,43 +120,94 @@ function OrderFormContent() {
       try {
         const parsedTicketData = JSON.parse(decodeURIComponent(ticketDataParam));
         
-        // Validate required ticket data fields
-        if (!parsedTicketData.trainName || !parsedTicketData.origin || !parsedTicketData.destination || 
-            !parsedTicketData.departureTime || !parsedTicketData.price || !parsedTicketData.departureDate) {
-          console.error('Incomplete ticket data from URL params');
-          alert('Data tiket tidak lengkap. Silakan pilih tiket kembali.');
-          router.push('/tickets');
-          return;
+        // Check if this is combined PP data (has departureTicket and returnTicket)
+        if (parsedTicketData.isPulangPergi && parsedTicketData.departureTicket && parsedTicketData.returnTicket) {
+          // Handle pulang-pergi tickets
+          const depTicket = parsedTicketData.departureTicket;
+          const retTicket = parsedTicketData.returnTicket;
+          
+          // Validate required ticket data fields for both tickets
+          if (!depTicket.trainName || !depTicket.origin || !depTicket.destination || 
+              !depTicket.departureTime || !depTicket.price || !depTicket.departureDate ||
+              !retTicket.trainName || !retTicket.origin || !retTicket.destination || 
+              !retTicket.departureTime || !retTicket.price || !retTicket.departureDate) {
+            console.error('Incomplete ticket data from URL params');
+            alert('Data tiket tidak lengkap. Silakan pilih tiket kembali.');
+            router.push('/tickets');
+            return;
+          }
+          
+          setTicketData(depTicket);
+          setReturnTicketData(retTicket);
+          setIsPulangPergi(true);
+          
+          // Initialize passengers data based on departure ticket data (same passengers for both trips)
+          const passengers: PassengerData[] = [];
+          
+          // Add adults
+          for (let i = 0; i < depTicket.adults; i++) {
+            passengers.push({
+              gender: "",
+              nama: "",
+              tipeIdentitas: "",
+              nomorIdentitas: "",
+              ageCategory: 'adult'
+            });
+          }
+          
+          // Add children
+          for (let i = 0; i < depTicket.children; i++) {
+            passengers.push({
+              gender: "",
+              nama: "",
+              tipeIdentitas: "",
+              nomorIdentitas: "",
+              ageCategory: 'child'
+            });
+          }
+          
+          setPassengersData(passengers);
+        } else {
+          // Handle one-way ticket
+          // Validate required ticket data fields
+          if (!parsedTicketData.trainName || !parsedTicketData.origin || !parsedTicketData.destination || 
+              !parsedTicketData.departureTime || !parsedTicketData.price || !parsedTicketData.departureDate) {
+            console.error('Incomplete ticket data from URL params');
+            alert('Data tiket tidak lengkap. Silakan pilih tiket kembali.');
+            router.push('/tickets');
+            return;
+          }
+          
+          setTicketData(parsedTicketData);
+          setIsPulangPergi(false);
+          
+          // Initialize passengers data based on ticket data
+          const passengers: PassengerData[] = [];
+          
+          // Add adults
+          for (let i = 0; i < parsedTicketData.adults; i++) {
+            passengers.push({
+              gender: "",
+              nama: "",
+              tipeIdentitas: "",
+              nomorIdentitas: "",
+              ageCategory: 'adult'
+            });
+          }
+          
+          // Add children
+          for (let i = 0; i < parsedTicketData.children; i++) {
+            passengers.push({
+              gender: "",
+              nama: "",
+              tipeIdentitas: "",
+              nomorIdentitas: "",
+              ageCategory: 'child'
+            });
+          }
+          
+          setPassengersData(passengers);
         }
-        
-        setTicketData(parsedTicketData);
-        
-        // Initialize passengers data based on ticket data
-        const passengers: PassengerData[] = [];
-        
-        // Add adults
-        for (let i = 0; i < parsedTicketData.adults; i++) {
-          passengers.push({
-            gender: "",
-            nama: "",
-            tipeIdentitas: "",
-            nomorIdentitas: "",
-            ageCategory: 'adult'
-          });
-        }
-        
-        // Add children
-        for (let i = 0; i < parsedTicketData.children; i++) {
-          passengers.push({
-            gender: "",
-            nama: "",
-            tipeIdentitas: "",
-            nomorIdentitas: "",
-            ageCategory: 'child'
-          });
-        }
-        
-        setPassengersData(passengers);
       } catch (error) {
         console.error('Error parsing ticket data:', error);
         // Redirect back to tickets page if data is invalid
@@ -455,6 +514,8 @@ function OrderFormContent() {
     // Prepare data untuk summary
     const orderData = {
       ticketData,
+      returnTicketData: isPulangPergi ? returnTicketData : undefined,
+      isPulangPergi,
       bookingData,
       passengersData,
       useBookingDataForPassenger
@@ -465,6 +526,12 @@ function OrderFormContent() {
       localStorage.setItem('orderData', JSON.stringify(orderData));
       
       console.log("Order Data:", orderData);
+      if (isPulangPergi && returnTicketData) {
+        console.log("🎫 Pulang-Pergi Mode: Including return ticket data");
+        console.log("Departure Total:", ticketData.totalPrice);
+        console.log("Return Total:", returnTicketData.totalPrice);
+        console.log("Combined Total:", ticketData.totalPrice + returnTicketData.totalPrice);
+      }
       
       // Navigate to summary page
       router.push('/summary');
@@ -879,12 +946,20 @@ function OrderFormContent() {
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 sm:p-6 rounded-t-lg">
                 <div className="flex items-center gap-2 text-white">
                   <Train className="w-4 h-4 sm:w-5 sm:h-5"/>
-                  <span className="text-base sm:text-lg font-semibold">Ringkasan Pemesanan</span>
+                  <span className="text-base sm:text-lg font-semibold">
+                    {isPulangPergi ? 'Ringkasan Pemesanan (PP)' : 'Ringkasan Pemesanan'}
+                  </span>
                 </div>
               </div>
               <div className="p-0">
-                {/* Train Info */}
+                {/* Departure Ticket Info */}
                 <div className="p-3 sm:p-4 border-b border-gray-100">
+                  {isPulangPergi && (
+                    <div className="flex items-center gap-1 mb-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="text-xs font-bold text-blue-900">Tiket Berangkat</span>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between mb-3 sm:mb-4">
                     <div className="flex-1 min-w-0 pr-2 sm:pr-3">
                       <h3 className="font-bold text-base sm:text-lg text-gray-800 mb-1 break-words leading-tight">
@@ -933,6 +1008,63 @@ function OrderFormContent() {
                     </div>
                   </div>
                 </div>
+
+                {/* Return Ticket Info (jika PP) */}
+                {isPulangPergi && returnTicketData && (
+                  <div className="p-3 sm:p-4 border-b border-gray-100 bg-orange-50/30">
+                    <div className="flex items-center gap-1 mb-2">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                      <span className="text-xs font-bold text-orange-900">Tiket Pulang</span>
+                    </div>
+                    <div className="flex items-start justify-between mb-3 sm:mb-4">
+                      <div className="flex-1 min-w-0 pr-2 sm:pr-3">
+                        <h3 className="font-bold text-base sm:text-lg text-gray-800 mb-1 break-words leading-tight">
+                          {returnTicketData.trainName || 'Nama Kereta Tidak Tersedia'}
+                        </h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge className={`${getClassBadgeColor(returnTicketData.class)} font-medium text-xs px-2 py-1`}>
+                            {returnTicketData.class}
+                          </Badge>
+                          <span className="text-xs text-gray-600">{returnTicketData.trainNumber}</span>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-xs text-gray-600">Tanggal</div>
+                        <div className="font-semibold text-xs sm:text-sm text-gray-800">
+                          {new Date(returnTicketData.departureDate).toLocaleDateString('id-ID', { 
+                            day: 'numeric', 
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Schedule */}
+                    <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-2.5 sm:p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-center flex-1 min-w-0">
+                          <div className="text-lg sm:text-xl font-bold text-gray-800">{returnTicketData.departureTime || '--:--'}</div>
+                          <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{returnTicketData.origin || 'Stasiun Asal'}</div>
+                        </div>
+                        <div className="flex-shrink-0 mx-1.5 sm:mx-2 flex items-center justify-center">
+                          <div className="flex items-center gap-0.5 sm:gap-1 text-xs text-gray-600">
+                            <div className="w-2 sm:w-3 h-0.5 bg-gray-300"></div>
+                            <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                            <div className="w-2 sm:w-3 h-0.5 bg-gray-300"></div>
+                          </div>
+                        </div>
+                        <div className="text-center flex-1 min-w-0">
+                          <div className="text-lg sm:text-xl font-bold text-gray-800">{returnTicketData.arrivalTime || '--:--'}</div>
+                          <div className="text-xs font-medium text-gray-600 mt-1 break-words px-1">{returnTicketData.destination || 'Stasiun Tujuan'}</div>
+                        </div>
+                      </div>
+                      <div className="text-center text-xs text-gray-600 mt-2">
+                        Durasi: {returnTicketData.duration}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Facilities */}
                 <div className="border-b border-gray-100">
@@ -989,12 +1121,18 @@ function OrderFormContent() {
                 <div className="p-3 sm:p-4">
                   <div className="space-y-1 sm:space-y-1.5 mb-2 sm:mb-3">
                     <div className="flex justify-between text-xs">
-                      <span className="text-gray-600">Harga per tiket</span>
-                      <span className="font-medium">{formatPrice(ticketData.price)}</span>
+                      <span className="text-gray-600">Harga tiket berangkat</span>
+                      <span className="font-medium">{formatPrice(ticketData.price)} x {ticketData.passengers}</span>
                     </div>
+                    {isPulangPergi && returnTicketData && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-600">Harga tiket pulang</span>
+                        <span className="font-medium">{formatPrice(returnTicketData.price)} x {returnTicketData.passengers}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-600">Jumlah penumpang</span>
-                      <span className="font-medium">{ticketData.passengers}x</span>
+                      <span className="font-medium">{ticketData.passengers} orang</span>
                     </div>
                   </div>
                   
@@ -1002,7 +1140,11 @@ function OrderFormContent() {
                     <div className="flex justify-between items-center">
                       <span className="text-xs sm:text-sm font-semibold text-gray-800">Total Harga</span>
                       <span className="text-base sm:text-lg font-bold text-blue-600">
-                        {formatPrice(ticketData.totalPrice)}
+                        {formatPrice(
+                          isPulangPergi && returnTicketData
+                            ? ticketData.totalPrice + returnTicketData.totalPrice
+                            : ticketData.totalPrice
+                        )}
                       </span>
                     </div>
                   </div>
