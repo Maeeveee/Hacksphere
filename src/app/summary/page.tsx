@@ -3,10 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Suspense } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Clock, MapPin, Train, Users, CreditCard, Wifi, Utensils, Zap, Bed, Star, CheckCircle, AlertTriangle, Edit3, MapPin as Location } from "lucide-react";
@@ -153,105 +149,58 @@ function SummaryContent() {
     fetchOccupiedSeats();
   }, [orderData]);
 
-  // Auto-assign seats for passengers who don't have seats yet
+  // Auto-assign seats when occupied seats are loaded and passengers don't have seats yet
   useEffect(() => {
-    const autoAssignSeats = async () => {
-      if (!orderData || isLoadingSeats) return;
-
-      let needsUpdate = false;
-      const updatedPassengers = [...orderData.passengersData];
-
-      // Auto-assign DEPARTURE seats for passengers without selectedSeat
-      const passengersNeedingDepartureSeats = updatedPassengers.filter(
-        p => !p.selectedSeat || !p.selectedSeat.seatNumber
-      );
-
-      if (passengersNeedingDepartureSeats.length > 0 && occupiedSeats.length > 0) {
-        console.log(`🎲 Auto-assigning ${passengersNeedingDepartureSeats.length} departure seats...`);
-        
-        // Combine occupied seats from database + seats already selected in this session
-        const sessionOccupiedSeats = updatedPassengers
-          .filter(p => p.selectedSeat && p.selectedSeat.seatNumber)
-          .map(p => p.selectedSeat!.seatNumber);
-
-        const allOccupiedSeats = [...new Set([...occupiedSeats, ...sessionOccupiedSeats])];
-        
-        console.log('🪑 Occupied departure seats:', allOccupiedSeats);
-        
-        // Generate random adjacent seats
-        const randomSeats = randomizeAdjacentSeats(
-          orderData.ticketData.class,
-          allOccupiedSeats,
-          passengersNeedingDepartureSeats.length
-        );
-
-        if (randomSeats.length >= passengersNeedingDepartureSeats.length) {
-          let seatIndex = 0;
-          updatedPassengers.forEach(passenger => {
-            if (!passenger.selectedSeat || !passenger.selectedSeat.seatNumber) {
-              passenger.selectedSeat = randomSeats[seatIndex];
-              console.log(`✅ Assigned departure seat ${randomSeats[seatIndex].seatNumber} to ${passenger.nama}`);
-              seatIndex++;
-              needsUpdate = true;
-            }
-          });
+    if (!orderData || isLoadingSeats || occupiedSeats.length === 0) return;
+    
+    // Check if any passenger doesn't have a seat yet
+    const hasUnassignedSeats = orderData.passengersData.some(p => !p.selectedSeat);
+    if (!hasUnassignedSeats) return; // All passengers already have seats
+    
+    console.log('🎯 Auto-assigning seats for passengers...');
+    
+    const seatMap = generateSeatMap();
+    const availableSeats: SeatData[] = [];
+    
+    // Collect all available seats
+    seatMap.forEach(row => {
+      row.forEach(seat => {
+        if (!seat.isOccupied) {
+          availableSeats.push(seat);
         }
-      }
+      });
+    });
 
-      // Auto-assign RETURN seats for PP bookings
-      if (orderData.isPulangPergi && orderData.returnTicketData) {
-        const passengersNeedingReturnSeats = updatedPassengers.filter(
-          p => !p.selectedSeatReturn || !p.selectedSeatReturn.seatNumber
-        );
+    // Check if we have enough available seats
+    if (availableSeats.length < orderData.passengersData.length) {
+      console.warn(`⚠️ Not enough seats available. Only ${availableSeats.length} seats for ${orderData.passengersData.length} passengers.`);
+      return;
+    }
 
-        if (passengersNeedingReturnSeats.length > 0 && occupiedSeatsReturn.length > 0) {
-          console.log(`🎲 Auto-assigning ${passengersNeedingReturnSeats.length} return seats...`);
-          
-          // Combine occupied seats from database + seats already selected in this session
-          const sessionOccupiedSeatsReturn = updatedPassengers
-            .filter(p => p.selectedSeatReturn && p.selectedSeatReturn.seatNumber)
-            .map(p => p.selectedSeatReturn!.seatNumber);
-
-          const allOccupiedSeatsReturn = [...new Set([...occupiedSeatsReturn, ...sessionOccupiedSeatsReturn])];
-          
-          console.log('🪑 Occupied return seats:', allOccupiedSeatsReturn);
-          
-          // Generate random adjacent seats for return trip
-          const randomSeatsReturn = randomizeAdjacentSeats(
-            orderData.returnTicketData.class,
-            allOccupiedSeatsReturn,
-            passengersNeedingReturnSeats.length
-          );
-
-          if (randomSeatsReturn.length >= passengersNeedingReturnSeats.length) {
-            let seatIndex = 0;
-            updatedPassengers.forEach(passenger => {
-              if (!passenger.selectedSeatReturn || !passenger.selectedSeatReturn.seatNumber) {
-                passenger.selectedSeatReturn = randomSeatsReturn[seatIndex];
-                console.log(`✅ Assigned return seat ${randomSeatsReturn[seatIndex].seatNumber} to ${passenger.nama}`);
-                seatIndex++;
-                needsUpdate = true;
-              }
-            });
-          }
-        }
-      }
-
-      // Update state and localStorage if changes were made
-      if (needsUpdate) {
-        const updatedOrderData = {
-          ...orderData,
-          passengersData: updatedPassengers
+    // Assign seats to passengers who don't have one
+    const updatedPassengers = [...orderData.passengersData];
+    let seatIndex = 0;
+    
+    for (let i = 0; i < updatedPassengers.length; i++) {
+      if (!updatedPassengers[i].selectedSeat) {
+        updatedPassengers[i] = {
+          ...updatedPassengers[i],
+          selectedSeat: availableSeats[seatIndex]
         };
-        setOrderData(updatedOrderData);
-        localStorage.setItem('orderData', JSON.stringify(updatedOrderData));
-        
-        console.log('🎫 All passengers now have seats assigned');
+        seatIndex++;
       }
+    }
+    
+    const updatedOrderData = {
+      ...orderData,
+      passengersData: updatedPassengers
     };
-
-    autoAssignSeats();
-  }, [orderData, occupiedSeats, occupiedSeatsReturn, isLoadingSeats]);
+    
+    setOrderData(updatedOrderData);
+    localStorage.setItem('orderData', JSON.stringify(updatedOrderData));
+    
+    console.log('✅ Auto-assigned seats successfully!');
+  }, [occupiedSeats, isLoadingSeats, orderData]);
 
   // Seat selection functions
   const handleSeatSelection = async (passengerIndex: number, forReturnTrip: boolean = false) => {
@@ -518,10 +467,10 @@ function SummaryContent() {
           {/* Left Column - Summary Details */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Trip Information - Tiket Berangkat */}
-            <Card className="shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
-                <CardTitle className="flex items-center gap-3">
+            {/* Trip Information */}
+            <div className="shadow-lg bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50 border-b border-gray-100 p-6 rounded-t-lg">
+                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
                     <Train className="w-5 h-5 text-white" />
                   </div>
@@ -534,9 +483,9 @@ function SummaryContent() {
                     </div>
                     <div className="text-sm text-gray-600">{ticketData.trainName} - {ticketData.trainNumber}</div>
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
+                </div>
+              </div>
+              <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
@@ -579,8 +528,8 @@ function SummaryContent() {
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Trip Information - Tiket Pulang (Only for PP) */}
             {orderData.isPulangPergi && orderData.returnTicketData && (
@@ -647,9 +596,9 @@ function SummaryContent() {
             )}
 
             {/* Booker Information */}
-            <Card className="shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-green-50/50 to-emerald-50/50">
-                <CardTitle className="flex items-center gap-3">
+            <div className="shadow-lg bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-green-50/50 to-emerald-50/50 border-b border-gray-100 p-6 rounded-t-lg">
+                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
                     <Users className="w-5 h-5 text-white" />
                   </div>
@@ -657,9 +606,9 @@ function SummaryContent() {
                     <div className="text-xl font-bold text-gray-800">Data Pemesan</div>
                     <div className="text-sm text-gray-600">Informasi kontak dan identitas pemesan</div>
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
+                </div>
+              </div>
+              <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <div className="text-sm text-gray-600">Nama Pemesan</div>
@@ -684,23 +633,23 @@ function SummaryContent() {
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Passengers Information with Seat Selection */}
-            <Card className="shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-purple-50/50 to-pink-50/50">
-                <CardTitle className="flex items-center gap-3">
+            <div className="shadow-lg bg-white hover:shadow-xl transition-all duration-300 overflow-hidden rounded-lg">
+              <div className="bg-gradient-to-r from-purple-50/50 to-pink-50/50 border-b border-gray-100 p-6 rounded-t-lg">
+                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
                     <Users className="w-5 h-5 text-white" />
                   </div>
                   <div>
                     <div className="text-xl font-bold text-gray-800">Data Penumpang & Kursi</div>
-                    <div className="text-sm text-gray-600">Daftar penumpang dan pilihan kursi</div>
+                    <div className="text-sm text-gray-600">Daftar penumpang dan pilihan kursi (dipilih otomatis)</div>
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
+                </div>
+              </div>
+              <div className="p-6">
                 <div className="space-y-6">
                   {passengersData.map((passenger, index) => (
                     <div key={index} className="border border-gray-200 rounded-lg p-4">
@@ -820,8 +769,8 @@ function SummaryContent() {
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
 
           {/* Right Column - Price Summary */}
