@@ -50,6 +50,8 @@ interface TicketData {
 
 interface OrderData {
   ticketData: TicketData;
+  returnTicketData?: TicketData; // Optional return ticket for PP
+  isPulangPergi: boolean; // Flag for round trip
   bookingData: BookingFormData;
   passengersData: PassengerData[];
   useBookingDataForPassenger: boolean;
@@ -58,7 +60,7 @@ interface OrderData {
 
 // Function to convert order data to the format expected by OrderSummary
 const convertToOrderSummaryFormat = (orderData: OrderData) => {
-  const { ticketData, bookingData, passengersData } = orderData;
+  const { ticketData, returnTicketData, isPulangPergi, bookingData, passengersData } = orderData;
   
   // Generate seat information based on class
   const getSeatInfo = (trainClass: string, index: number = 0) => {
@@ -88,8 +90,14 @@ const convertToOrderSummaryFormat = (orderData: OrderData) => {
 
   const seatInfo = getSeatInfo(ticketData.class);
   
-  return {
-    totalPrice: ticketData.totalPrice,
+  // Calculate total price (departure + return if PP)
+  const totalPrice = isPulangPergi && returnTicketData
+    ? ticketData.totalPrice + returnTicketData.totalPrice
+    : ticketData.totalPrice;
+  
+  // Base format for departure ticket
+  const baseFormat = {
+    totalPrice: totalPrice,
     train: {
       name: ticketData.trainName || 'Kereta Api',
       number: ticketData.trainNumber || 'N/A',
@@ -117,6 +125,36 @@ const convertToOrderSummaryFormat = (orderData: OrderData) => {
       phone: bookingData.noHP || '',
     }
   };
+  
+  // Add return trip if PP
+  if (isPulangPergi && returnTicketData) {
+    const returnSeatInfo = getSeatInfo(returnTicketData.class);
+    
+    return {
+      ...baseFormat,
+      isPulangPergi: true,
+      returnTrain: {
+        name: returnTicketData.trainName || 'Kereta Api',
+        number: returnTicketData.trainNumber || 'N/A',
+        class: returnTicketData.class || 'Eksekutif',
+        subclass: returnTicketData.class === 'Eksekutif' ? 'AA' : 'A',
+      },
+      returnTrip: {
+        origin: returnTicketData.origin || 'Stasiun Asal',
+        destination: returnTicketData.destination || 'Stasiun Tujuan',
+        departure: formatDateTime(returnTicketData.departureDate, returnTicketData.departureTime),
+        arrival: formatDateTime(returnTicketData.departureDate, returnTicketData.arrivalTime),
+      },
+      returnSeat: returnSeatInfo,
+      returnPassengers: passengersData.map((passenger, index) => ({
+        name: passenger.nama ? passenger.nama.toUpperCase() : `PENUMPANG ${index + 1}`,
+        type: passenger.ageCategory === 'adult' ? 'Dewasa' : 'Anak-anak',
+        price: passenger.ageCategory === 'adult' ? returnTicketData.price : Math.floor(returnTicketData.price * 0.75)
+      }))
+    };
+  }
+  
+  return baseFormat;
 };
 
 function PaymentPageContent() {

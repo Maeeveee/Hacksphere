@@ -17,6 +17,9 @@ interface BookingData {
     departureDate: string;
     isDifabel: boolean;
     isPulangPergi: boolean;
+    returnDate: string;
+    returnOrigin: string;
+    returnDestination: string;
 }
 
 const STORAGE_KEY = 'kai-booking-data';
@@ -31,6 +34,9 @@ export default function BookingForm() {
         departureDate: "",
         isDifabel: false,
         isPulangPergi: false,
+        returnDate: "",
+        returnOrigin: "",
+        returnDestination: "",
     });
     const [validationMessage, setValidationMessage] = useState<string>("");
 
@@ -74,6 +80,29 @@ export default function BookingForm() {
             return;
         }
 
+        // Validasi pulang-pergi
+        if (bookingData.isPulangPergi) {
+            if (!bookingData.returnDate) {
+                setValidationMessage('Tanggal pulang harus diisi untuk tiket pulang-pergi!');
+                return;
+            }
+            
+            // Tanggal pulang harus sama atau setelah tanggal berangkat (bisa hari yang sama, beda jam)
+            if (bookingData.returnDate < bookingData.departureDate) {
+                setValidationMessage('Tanggal pulang tidak boleh lebih awal dari tanggal keberangkatan!');
+                return;
+            }
+
+            // Set default return origin/destination jika belum diisi (swap)
+            if (!bookingData.returnOrigin) {
+                setBookingData(prev => ({
+                    ...prev,
+                    returnOrigin: bookingData.destination,
+                    returnDestination: bookingData.origin
+                }));
+            }
+        }
+
         const params = new URLSearchParams({
             origin: bookingData.origin,
             destination: bookingData.destination,
@@ -81,8 +110,15 @@ export default function BookingForm() {
             children: bookingData.children.toString(),
             departureDate: bookingData.departureDate,
             isDifabel: bookingData.isDifabel.toString(),
-            isPulangPergi: bookingData.isPulangPergi.toString()
+            isPulangPergi: bookingData.isPulangPergi.toString(),
         });
+
+        // Add return trip params if pulang-pergi
+        if (bookingData.isPulangPergi && bookingData.returnDate) {
+            params.set('returnDate', bookingData.returnDate);
+            params.set('returnOrigin', bookingData.returnOrigin || bookingData.destination);
+            params.set('returnDestination', bookingData.returnDestination || bookingData.origin);
+        }
 
         router.push(`/tickets?${params.toString()}`);
     };
@@ -122,6 +158,9 @@ export default function BookingForm() {
             departureDate: "",
             isDifabel: false,
             isPulangPergi: false,
+            returnDate: "",
+            returnOrigin: "",
+            returnDestination: "",
         };
         setBookingData(emptyData);
         localStorage.removeItem(STORAGE_KEY);
@@ -199,6 +238,122 @@ export default function BookingForm() {
                             />
                         </div>
 
+                        {/* Checkbox Options - Move before passengers */}
+                        <div className="space-y-2 sm:space-y-3">
+                            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                                <div>
+                                    <Label className="text-xs sm:text-sm font-semibold text-gray-800 block mb-2">
+                                        Kebutuhan Khusus
+                                    </Label>
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="difable"
+                                            checked={bookingData.isDifabel}
+                                            onCheckedChange={(checked) => handleInputChange("isDifabel", checked as boolean)}
+                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                        />
+                                        <Label
+                                            htmlFor="difable"
+                                            className="text-xs sm:text-sm text-gray-700 font-medium cursor-pointer"
+                                        >
+                                            Difabel
+                                        </Label>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <Label className="text-xs sm:text-sm font-semibold text-gray-800 block mb-2">
+                                        Paket
+                                    </Label>
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="pulangPergi"
+                                            checked={bookingData.isPulangPergi}
+                                            onCheckedChange={(checked) => {
+                                                handleInputChange("isPulangPergi", checked as boolean);
+                                                // Auto-set return origin/destination (swap) when checked
+                                                if (checked && bookingData.origin && bookingData.destination) {
+                                                    setBookingData(prev => ({
+                                                        ...prev,
+                                                        isPulangPergi: true,
+                                                        returnOrigin: prev.destination,
+                                                        returnDestination: prev.origin
+                                                    }));
+                                                }
+                                            }}
+                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                        />
+                                        <Label
+                                            htmlFor="pulangPergi"
+                                            className="text-xs sm:text-sm text-gray-700 font-medium cursor-pointer"
+                                        >
+                                            Pulang - Pergi
+                                        </Label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Return Trip Section - Show when PP is checked */}
+                        {bookingData.isPulangPergi && (
+                            <div className="space-y-3 p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                                    <Label className="text-sm font-bold text-blue-900">
+                                        Perjalanan Pulang
+                                    </Label>
+                                </div>
+
+                                {/* Return Route */}
+                                <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="returnOrigin" className="text-xs sm:text-sm font-semibold text-gray-800">
+                                            Dari
+                                        </Label>
+                                        <StasiunSelector
+                                            value={bookingData.returnOrigin || bookingData.destination}
+                                            onChange={(value) => handleInputChange("returnOrigin", value)}
+                                            placeholder="Stasiun asal pulang..."
+                                            className="w-full"
+                                            excludeStasiun={bookingData.returnDestination}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="returnDestination" className="text-xs sm:text-sm font-semibold text-gray-800">
+                                            Ke
+                                        </Label>
+                                        <StasiunSelector
+                                            value={bookingData.returnDestination || bookingData.origin}
+                                            onChange={(value) => handleInputChange("returnDestination", value)}
+                                            placeholder="Stasiun tujuan pulang..."
+                                            className="w-full"
+                                            excludeStasiun={bookingData.returnOrigin}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Return Date */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="returnDate" className="text-sm font-semibold text-gray-800">
+                                        Tanggal Pulang
+                                    </Label>
+                                    <Input
+                                        id="returnDate"
+                                        type="date"
+                                        value={bookingData.returnDate}
+                                        onChange={(e) => handleInputChange("returnDate", e.target.value)}
+                                        min={bookingData.departureDate || getTodayDate()}
+                                        className="w-full h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white"
+                                        required={bookingData.isPulangPergi}
+                                    />
+                                    <p className="text-xs text-gray-600 mt-1">
+                                        Bisa pilih hari yang sama (tiket dengan jam berbeda)
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Passengers */}
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-gray-800">
@@ -236,51 +391,6 @@ export default function BookingForm() {
                                         onChange={(e) => handleInputChange("children", parseInt(e.target.value) || 0)}
                                         className="w-full h-9 sm:h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white text-sm"
                                     />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Checkbox Options */}
-                        <div className="space-y-2 sm:space-y-3">
-                            <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                                <div>
-                                    <Label className="text-xs sm:text-sm font-semibold text-gray-800 block mb-2">
-                                        Kebutuhan Khusus
-                                    </Label>
-                                    <div className="flex items-center space-x-2">
-                                        <Checkbox
-                                            id="difable"
-                                            checked={bookingData.isDifabel}
-                                            onCheckedChange={(checked) => handleInputChange("isDifabel", checked as boolean)}
-                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                                        />
-                                        <Label
-                                            htmlFor="difable"
-                                            className="text-xs sm:text-sm text-gray-700 font-medium cursor-pointer"
-                                        >
-                                            Difabel
-                                        </Label>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <Label className="text-xs sm:text-sm font-semibold text-gray-800 block mb-2">
-                                        Paket
-                                    </Label>
-                                    <div className="flex items-center space-x-2">
-                                        <Checkbox
-                                            id="pulangPergi"
-                                            checked={bookingData.isPulangPergi}
-                                            onCheckedChange={(checked) => handleInputChange("isPulangPergi", checked as boolean)}
-                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                                        />
-                                        <Label
-                                            htmlFor="pulangPergi"
-                                            className="text-xs sm:text-sm text-gray-700 font-medium cursor-pointer"
-                                        >
-                                            Pulang - Pergi
-                                        </Label>
-                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -17,6 +17,11 @@ interface TicketData {
     qrCodeValue: string;
 }
 
+interface TicketDisplayProps {
+    ticket: TicketData;
+    variant?: 'departure' | 'return'; // Untuk membedakan tiket berangkat dan pulang
+}
+
 const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('id-ID', {
@@ -35,11 +40,17 @@ const formatTime = (dateString: string) => {
 };
 
 
-export default function TicketDisplay({ ticket }: { ticket: TicketData }) {
+export default function TicketDisplay({ ticket, variant = 'departure' }: TicketDisplayProps) {
+    // Warna header berdasarkan variant
+    const headerColors = {
+        departure: 'bg-blue-800',
+        return: 'bg-orange-600'
+    };
+
     return (
-        <div className="w-full max-w-sm mx-auto bg-white rounded-xl shadow-2xl overflow-hidden border-0">
-            {/* Header Biru */}
-            <div className="bg-blue-800 text-white p-4">
+        <div className="w-full max-w-md mx-auto bg-white rounded-xl shadow-2xl overflow-hidden border-0">
+            {/* Header dengan warna dinamis */}
+            <div className={`${headerColors[variant]} text-white p-4`}>
                 <div className="flex items-center justify-between">
                     <div>
                         <p className="text-lg font-bold">{ticket.trainName} ({ticket.trainNumber})</p>
@@ -67,18 +78,18 @@ export default function TicketDisplay({ ticket }: { ticket: TicketData }) {
                  <div className="grid grid-cols-2 gap-4 text-left">
                     <div>
                          <p className="text-xs text-gray-500">Penumpang</p>
-                         <p className="font-bold text-gray-800">{ticket.passengerName}</p>
+                         <p className="font-bold text-gray-800 text-sm">{ticket.passengerName}</p>
                     </div>
                      <div>
                          <p className="text-xs text-gray-500">No. Kursi</p>
-                         <p className="font-bold text-gray-800">{ticket.seatNumber}</p>
+                         <p className="font-bold text-gray-800 text-sm">{ticket.seatNumber}</p>
                     </div>
                  </div>
 
                 <div className="flex justify-center my-4">
                      <QRCodeSVG 
                         value={ticket.qrCodeValue}
-                        size={180} 
+                        size={160} 
                         bgColor="#ffffff"
                         fgColor="#000000"
                         level="Q"
